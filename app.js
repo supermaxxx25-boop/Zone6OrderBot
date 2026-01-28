@@ -1,11 +1,11 @@
 Telegram.WebApp.ready()
 Telegram.WebApp.expand()
 
-function sendOrder() {
-  const data = {
-    Burger: 2,
-    Pizza: 1
-  }
+Telegram.WebApp.MainButton.setText("VALIDER LE TEST")
+Telegram.WebApp.MainButton.show()
 
-  Telegram.WebApp.sendData(JSON.stringify(data))
-}
+Telegram.WebApp.MainButton.onClick(() => {
+  Telegram.WebApp.sendData(
+    JSON.stringify({ test: "OK" })
+  )
+})
