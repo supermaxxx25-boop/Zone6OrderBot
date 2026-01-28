@@ -23,31 +23,35 @@ MENU = {
     "riz": {"nom": "🍛 Riz sauce poulet", "prix": 8},
 }
 
-COMMANDES = {}  # order_id -> data
+COMMANDES = {}  # order_id -> commande figée
 
 # =====================
 # START
 # =====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    clavier = [[InlineKeyboardButton("🛒 Ouvrir la boutique", callback_data="boutique")]]
     await update.message.reply_text(
-        "👋 Bienvenue chez *Zone 6 Food*\nCommande en quelques clics 👇",
+        "👋 Bienvenue chez *Zone 6 Food*\n\n"
+        "Commande facilement 👇",
         parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(clavier)
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🛒 Ouvrir la boutique", callback_data="boutique")]
+        ])
     )
 
 # =====================
 # BOUTIQUE
 # =====================
 async def boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+    q = update.callback_query
+    await q.answer()
     context.user_data.setdefault("panier", {})
 
-    await query.edit_message_text(
+    await q.edit_message_text(
         "🍽️ *Menu Zone 6 Food*\n\n"
-        "🍔 Burger – 7 €\n🍕 Pizza – 10 €\n🍛 Riz poulet – 8 €\n\n"
-        "👉 Clique pour ajouter",
+        "🍔 Burger – 7 €\n"
+        "🍕 Pizza – 10 €\n"
+        "🍛 Riz poulet – 8 €\n\n"
+        "👉 Clique pour ajouter au panier",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
             [
@@ -55,7 +59,7 @@ async def boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("🍕 Pizza", callback_data="add_pizza")
             ],
             [InlineKeyboardButton("🍛 Riz", callback_data="add_riz")],
-            [InlineKeyboardButton("🛒 Mon panier", callback_data="panier")]
+            [InlineKeyboardButton("🛒 Voir mon panier", callback_data="panier")]
         ])
     )
 
@@ -65,9 +69,11 @@ async def boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def ajouter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    p = q.data.replace("add_", "")
+
+    produit = q.data.replace("add_", "")
     panier = context.user_data["panier"]
-    panier[p] = panier.get(p, 0) + 1
+    panier[produit] = panier.get(produit, 0) + 1
+
     await afficher_panier(q, context)
 
 # =====================
@@ -80,25 +86,40 @@ async def panier_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def afficher_panier(q, context):
     panier = context.user_data.get("panier", {})
+
     if not panier:
-        await q.edit_message_text("🛒 Panier vide")
+        await q.edit_message_text(
+            "🛒 *Ton panier est vide*",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("⬅️ Retour menu", callback_data="boutique")]
+            ])
+        )
         return
 
     texte = "🛒 *Ton panier*\n\n"
     clavier = []
 
-    for k, v in panier.items():
-        p = MENU[k]
-        texte += f"{p['nom']} x{v} = {p['prix']*v} €\n"
+    for cle, qte in panier.items():
+        p = MENU[cle]
+        sous_total = p["prix"] * qte
+        texte += (
+            f"{p['nom']}\n"
+            f"➜ Quantité : {qte}\n"
+            f"➜ Sous-total : {sous_total} €\n\n"
+        )
+
         clavier.append([
-            InlineKeyboardButton("➖", callback_data=f"moins_{k}"),
-            InlineKeyboardButton("➕", callback_data=f"plus_{k}"),
-            InlineKeyboardButton("🗑️", callback_data=f"del_{k}")
+            InlineKeyboardButton("➖", callback_data=f"moins_{cle}"),
+            InlineKeyboardButton("➕", callback_data=f"plus_{cle}"),
+            InlineKeyboardButton("🗑️ Retirer", callback_data=f"del_{cle}")
         ])
 
-    texte += f"\n💰 *Total : {calcul_total(panier)} €*"
+    total = calcul_total(panier)
+    texte += f"💰 *Total : {total} €*"
 
-    clavier.append([InlineKeyboardButton("✅ Confirmer", callback_data="valider")])
+    clavier.append([InlineKeyboardButton("✅ Confirmer la commande", callback_data="valider")])
+    clavier.append([InlineKeyboardButton("⬅️ Continuer mes achats", callback_data="boutique")])
 
     await q.edit_message_text(
         texte,
@@ -112,17 +133,18 @@ async def afficher_panier(q, context):
 async def modifier_panier(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    action, prod = q.data.split("_")
+
+    action, cle = q.data.split("_")
     panier = context.user_data["panier"]
 
     if action == "plus":
-        panier[prod] += 1
+        panier[cle] += 1
     elif action == "moins":
-        panier[prod] -= 1
-        if panier[prod] <= 0:
-            del panier[prod]
+        panier[cle] -= 1
+        if panier[cle] <= 0:
+            del panier[cle]
     elif action == "del":
-        del panier[prod]
+        del panier[cle]
 
     await afficher_panier(q, context)
 
@@ -132,8 +154,11 @@ async def modifier_panier(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
+
     await q.edit_message_text(
-        "📍 Envoie maintenant ton *adresse + téléphone*",
+        "📍 Envoie maintenant :\n"
+        "• Adresse de livraison\n"
+        "• Téléphone",
         parse_mode="Markdown"
     )
     context.user_data["attente_infos"] = True
@@ -145,35 +170,47 @@ async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("attente_infos"):
         return
 
-    order_id = str(uuid.uuid4())[:8]
+    user = update.message.from_user
     panier = context.user_data["panier"]
     total = calcul_total(panier)
-    user = update.message.from_user
+    infos = update.message.text
+    order_id = str(uuid.uuid4())[:8]
 
+    # On fige la commande
     COMMANDES[order_id] = {
         "client_id": user.id,
-        "panier": panier,
+        "client_nom": user.full_name,
+        "panier": panier.copy(),
         "total": total
     }
 
-    # Client
-    msg = await update.message.reply_text(
+    # CLIENT
+    await update.message.reply_text(
         f"✅ *Commande confirmée*\n"
         f"🆔 `{order_id}`\n\n"
         "👨‍🍳 *Statut : En préparation*",
         parse_mode="Markdown"
     )
 
-    # Admin
+    # ADMIN (BON DÉTAILLÉ)
+    texte_admin = (
+        f"🆕 *NOUVELLE COMMANDE*\n"
+        f"🆔 `{order_id}`\n\n"
+        f"👤 Client : {user.full_name}\n"
+        f"🆔 Telegram : `{user.id}`\n\n"
+        f"🧾 *DÉTAIL COMMANDE*\n"
+        f"{resume_panier(panier)}\n"
+        f"💰 *Total : {total} €*\n\n"
+        f"📍 Infos client :\n{infos}"
+    )
+
     await context.bot.send_message(
         ADMIN_ID,
-        f"🆕 *Commande {order_id}*\n"
-        f"Client : {user.full_name}\n"
-        f"Total : {total} €",
+        texte_admin,
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("👨‍🍳 Préparation", callback_data=f"statut_prep_{order_id}")],
-            [InlineKeyboardButton("🛵 Livraison", callback_data=f"statut_livraison_{order_id}")],
+            [InlineKeyboardButton("👨‍🍳 En préparation", callback_data=f"statut_prep_{order_id}")],
+            [InlineKeyboardButton("🛵 En livraison", callback_data=f"statut_livraison_{order_id}")],
             [InlineKeyboardButton("✅ Livrée", callback_data=f"statut_livree_{order_id}")]
         ])
     )
@@ -207,8 +244,15 @@ async def statut_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =====================
 # UTILS
 # =====================
-def calcul_total(p):
-    return sum(MENU[k]["prix"] * v for k, v in p.items())
+def calcul_total(panier):
+    return sum(MENU[k]["prix"] * v for k, v in panier.items())
+
+def resume_panier(panier):
+    texte = ""
+    for k, v in panier.items():
+        p = MENU[k]
+        texte += f"• {p['nom']} x{v} = {p['prix']*v} €\n"
+    return texte
 
 # =====================
 # MAIN
@@ -225,7 +269,7 @@ def main():
     app.add_handler(CallbackQueryHandler(statut_handler, "^statut_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, infos_client))
 
-    print("🤖 Bot Zone 6 Food avec STATUTS actif")
+    print("🤖 Zone 6 Food — VERSION STABLE")
     app.run_polling()
 
 if __name__ == "__main__":
