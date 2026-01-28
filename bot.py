@@ -161,7 +161,7 @@ async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["attente_infos"] = True
 
     await q.edit_message_text(
-        "📍 *Merci de préciser :*\n"
+        "📍*Merci de préciser :*\n"
         "• Adresse de livraison\n"
         "• Téléphone",
         parse_mode="Markdown"
@@ -176,6 +176,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await update.message.reply_text(
+        "👋 Bienvenue dans la Zone6 👽"
         "🛒 Tu peux commander ici 👇",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🛍️ Ouvrir la boutique", callback_data="boutique")]
