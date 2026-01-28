@@ -18,7 +18,7 @@ from telegram.ext import (
 # CONFIG
 # =========================
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = 8348647959  # ⚠️ remplace par TON ID
+ADMIN_ID = 8348647959  # ⚠️ ton ID
 
 PRODUITS = {
     "Burger": ("🍔 Burger + frites", 3500),
@@ -30,6 +30,7 @@ PRODUITS = {
 # START
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.clear()
     context.user_data["panier"] = {}
 
     clavier = InlineKeyboardMarkup([
@@ -39,7 +40,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         "👋 Bienvenue sur *Zone 6 Food* 🍽️\n\n"
-        "Ajoute plusieurs plats et gère ton panier 👇",
+        "Ajoute des plats puis gère ton panier 👇",
         parse_mode="Markdown",
         reply_markup=clavier
     )
@@ -57,8 +58,7 @@ async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     await query.message.reply_text(
-        "🍽️ *Menu*\n\n"
-        "Clique sur un plat pour l’ajouter au panier 👇",
+        "🍽️ *Menu*\nClique sur un plat pour l’ajouter 👇",
         parse_mode="Markdown",
         reply_markup=menu
     )
@@ -105,10 +105,10 @@ async def afficher_panier(update: Update, context: ContextTypes.DEFAULT_TYPE):
         texte += f"{nom}\n🔢 {qte} × {prix} = {sous_total} FCFA\n\n"
 
         boutons.append([
-            InlineKeyboardButton("➖", callback_data=f"moins_{key}"),
+            InlineKeyboardButton("➖", callback_data=f"moins:{key}"),
             InlineKeyboardButton(f"{qte}", callback_data="noop"),
-            InlineKeyboardButton("➕", callback_data=f"plus_{key}"),
-            InlineKeyboardButton("❌", callback_data=f"del_{key}")
+            InlineKeyboardButton("➕", callback_data=f"plus:{key}"),
+            InlineKeyboardButton("❌", callback_data=f"del:{key}")
         ])
 
     texte += f"💰 *Total : {total} FCFA*"
@@ -123,46 +123,39 @@ async def afficher_panier(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =========================
-# BOUTONS PANIER
+# BOUTONS PANIER (CRITIQUE)
 # =========================
 async def panier_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     panier = context.user_data.get("panier", {})
-
-    if not panier:
-        return
-
     data = query.data
 
-    if data.startswith("plus_"):
-        key = data.replace("plus_", "")
+    if data.startswith("plus:"):
+        key = data.split(":")[1]
         panier[key] += 1
 
-    elif data.startswith("moins_"):
-        key = data.replace("moins_", "")
+    elif data.startswith("moins:"):
+        key = data.split(":")[1]
         if panier[key] > 1:
             panier[key] -= 1
 
-    elif data.startswith("del_"):
-        key = data.replace("del_", "")
+    elif data.startswith("del:"):
+        key = data.split(":")[1]
         panier.pop(key, None)
 
     elif data == "valider":
         context.user_data["step"] = "infos"
         await query.message.reply_text(
-            "📍 Envoie maintenant :\n"
-            "• Adresse\n"
-            "• Téléphone\n\n"
-            "💵 Paiement à la livraison"
+            "📍 Envoie maintenant :\n• Adresse\n• Téléphone\n\n💵 Paiement à la livraison"
         )
         return
 
     await afficher_panier(query.message, context)
 
 # =========================
-# INFOS CLIENT & CONFIRMATION
+# INFOS CLIENT
 # =========================
 async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("step") != "infos":
@@ -172,54 +165,47 @@ async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     infos = update.message.text
 
-    texte_panier = ""
+    texte = ""
     total = 0
 
     for key, qte in panier.items():
         nom, prix = PRODUITS[key]
-        sous_total = qte * prix
-        total += sous_total
-        texte_panier += f"{nom} × {qte} = {sous_total} FCFA\n"
+        sous = qte * prix
+        total += sous
+        texte += f"{nom} × {qte} = {sous} FCFA\n"
 
-    # Client
     await update.message.reply_text(
-        "✅ *Commande confirmée !*\n\n"
-        f"{texte_panier}\n"
-        f"💰 Total : {total} FCFA\n"
-        f"📍 Infos : {infos}\n\n"
-        "⏱️ Livraison en cours. Merci 🙏",
+        f"✅ *Commande confirmée !*\n\n{texte}\n💰 Total : {total} FCFA\n📍 {infos}",
         parse_mode="Markdown"
     )
 
-    # Admin
     await context.bot.send_message(
         chat_id=ADMIN_ID,
         text=(
-            "📦 *NOUVELLE COMMANDE*\n\n"
-            f"👤 Client : {user.first_name or ''}\n"
-            f"🆔 ID : `{user.id}`\n\n"
-            f"{texte_panier}\n"
-            f"💰 Total : {total} FCFA\n"
-            f"📍 Infos : {infos}"
-        ),
-        parse_mode="Markdown"
+            f"📦 NOUVELLE COMMANDE\n\n"
+            f"Client : {user.first_name}\n"
+            f"ID : {user.id}\n\n"
+            f"{texte}\n"
+            f"Total : {total} FCFA\n"
+            f"Infos : {infos}"
+        )
     )
 
     context.user_data.clear()
 
 # =========================
-# MAIN
+# MAIN (ORDRE CRUCIAL)
 # =========================
 def main():
-    if not TOKEN:
-        raise RuntimeError("❌ BOT_TOKEN manquant")
-
     app = ApplicationBuilder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(shop, pattern="shop"))
-    app.add_handler(CallbackQueryHandler(afficher_panier, pattern="panier"))
+    # ⚠️ CALLBACKS D’ABORD
+    app.add_handler(CallbackQueryHandler(shop, pattern="^shop$"))
+    app.add_handler(CallbackQueryHandler(afficher_panier, pattern="^panier$"))
     app.add_handler(CallbackQueryHandler(panier_buttons))
+
+    # COMMANDES & MESSAGES APRÈS
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, messages))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, infos_client))
 
