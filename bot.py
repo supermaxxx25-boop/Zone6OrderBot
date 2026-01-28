@@ -14,9 +14,12 @@ ADMIN_ID = 8348647959  # remplace par TON vrai ID Telegram
 # -------- COMMANDES --------
 
 async def start(update, context):
-    await update.message.reply_text(
-        "✅ Bot en ligne !\n"
-        "Tape /boutique pour voir le menu 🍽️"
+    await update.message.reply_text("✅ Bot en ligne !")
+
+    # TEST ADMIN
+    await context.bot.send_message(
+        chat_id=ADMIN_ID,
+        text="🧪 TEST : message admin OK"
     )
 
 
