@@ -10,10 +10,10 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram.ext import ApplicationBuilder
 
 from database import init_db
-from handlers.start import register_start
-from handlers.boutique import register_boutique
-from handlers.panier import register_panier
-from handlers.commande import register_commande
+from start import register_start
+from boutique import register_boutique
+from panier import register_panier
+from commande import register_commande
 
 
 # =========================
