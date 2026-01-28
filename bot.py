@@ -97,6 +97,7 @@ async def choix_produit(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # FINALISATION
 # =========================
 async def finaliser_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("🔥 FINALISER_COMMANDE APPELÉE")
     infos = update.message.text
     produit = context.user_data.get("commande")
 
