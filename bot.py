@@ -2,7 +2,7 @@ import os
 import uuid
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder,
+    Application,
     CommandHandler,
     CallbackQueryHandler,
     MessageHandler,
@@ -16,6 +16,9 @@ from telegram.ext import (
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 8348647959
 DEVISE = "€"
+
+if not TOKEN:
+    raise RuntimeError("❌ BOT_TOKEN manquant (Railway > Variables)")
 
 COMMANDES = {}
 
@@ -63,10 +66,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================
-# MESSAGE TEXTE UNIQUE (FIX)
+# MESSAGE TEXTE UNIQUE
 # =====================
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # CAS 1 : attente infos client
     if context.user_data.get("attente_infos"):
         panier = context.user_data.get("panier", {})
         if not panier:
@@ -93,7 +95,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
         return
 
-    # CAS 2 : message normal
     await update.message.reply_text(
         "👋 Salut et bienvenue dans la Zone6,\n🛒 Tu peux commander ici 👇",
         reply_markup=InlineKeyboardMarkup([
@@ -235,16 +236,15 @@ def calcul_total(panier):
 # MAIN
 # =====================
 def main():
-    app = ApplicationBuilder().token(TOKEN).build()
+    app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(boutique, "^boutique$"))
-    app.add_handler(CallbackQueryHandler(afficher_categorie, "^cat_"))
-    app.add_handler(CallbackQueryHandler(ajouter, "^add_"))
-    app.add_handler(CallbackQueryHandler(panier_handler, "^panier$"))
-    app.add_handler(CallbackQueryHandler(valider, "^valider$"))
+    app.add_handler(CallbackQueryHandler(boutique, pattern="^boutique$"))
+    app.add_handler(CallbackQueryHandler(afficher_categorie, pattern="^cat_"))
+    app.add_handler(CallbackQueryHandler(ajouter, pattern="^add_"))
+    app.add_handler(CallbackQueryHandler(panier_handler, pattern="^panier$"))
+    app.add_handler(CallbackQueryHandler(valider, pattern="^valider$"))
 
-    # ✅ UN SEUL handler texte (clé de stabilité)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
     print("🤖 Zone 6 Food — Bot actif")
