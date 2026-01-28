@@ -48,9 +48,10 @@ async def handle_order(update, context):
         produit = "Riz sauce poulet"
         prix = "4 000 FCFA"
     else:
-        return
+        return  # ⛔️ très important
 
     context.user_data["commande"] = produit
+    context.user_data["etat"] = "attente_infos"
 
     await update.message.reply_text(
         f"🛒 *Commande :* {produit}\n"
@@ -64,13 +65,13 @@ async def handle_order(update, context):
 
 
 async def finaliser_commande(update, context):
-    if "commande" not in context.user_data:
-        return
+    if context.user_data.get("etat") != "attente_infos":
+        return  # ⛔️ empêche l’exécution au mauvais moment
 
     infos = update.message.text
-    produit = context.user_data["commande"]
+    produit = context.user_data.get("commande")
 
-    # Message pour le client
+    # Message client
     await update.message.reply_text(
         "✅ *Commande confirmée !*\n\n"
         f"🍽️ Plat : {produit}\n"
@@ -79,6 +80,20 @@ async def finaliser_commande(update, context):
         "⏱️ Livraison en cours.\nMerci 🙏",
         parse_mode="Markdown"
     )
+
+    # Message ADMIN
+    await context.bot.send_message(
+        chat_id=ADMIN_ID,
+        text=(
+            "📦 *NOUVELLE COMMANDE*\n\n"
+            f"👤 Client : @{update.effective_user.username}\n"
+            f"🍽️ Plat : {produit}\n"
+            f"📍 Infos : {infos}"
+        ),
+        parse_mode="Markdown"
+    )
+
+    context.user_data.clear()
 
     # 🔔 MESSAGE ADMIN
     await context.bot.send_message(
