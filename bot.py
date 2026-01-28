@@ -199,13 +199,15 @@ async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "⏳ En attente de confirmation par Zone6"
     )
 
-    await update.message.reply_text(
+    msg_recap = await update.message.reply_text(
         recap_client,
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("❌ Annuler ma commande", callback_data=f"cancel_{order_id}")]
         ])
     )
+
+    COMMANDES[order_id]["recap_message_id"] = msg_recap.message_id
 
     texte_admin = (
         f"🆕 *NOUVELLE COMMANDE*\n"
@@ -271,6 +273,16 @@ async def decision_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if action == "accept":
+        # Supprimer le bouton Annuler côté client
+        try:
+            await context.bot.edit_message_reply_markup(
+                chat_id=cmd["client_id"],
+                message_id=cmd.get("recap_message_id"),
+                reply_markup=None
+            )
+        except:
+            pass
+
         await q.edit_message_reply_markup(
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("👨‍🍳 En préparation", callback_data=f"statut_prep_{order_id}")],
@@ -350,7 +362,7 @@ def main():
     app.add_handler(CallbackQueryHandler(statut_handler, "^statut_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, infos_client))
 
-    print("🤖 Zone 6 Food — version finale + annulation client")
+    print("🤖 Zone 6 Food — version finale (annulation désactivée après acceptation)")
     app.run_polling()
 
 if __name__ == "__main__":
