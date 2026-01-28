@@ -1,11 +1,25 @@
-from telegram.ext import ApplicationBuilder, CommandHandler
 import os
+from telegram import ReplyKeyboardMarkup
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    filters,
+)
 
 TOKEN = os.getenv("BOT_TOKEN")
 
+
+# -------- COMMANDES --------
+
 async def start(update, context):
-    await update.message.reply_text("✅ Bot en ligne !")
-    async def boutique(update, context):
+    await update.message.reply_text(
+        "✅ Bot en ligne !\n"
+        "Tape /boutique pour voir le menu 🍽️"
+    )
+
+
+async def boutique(update, context):
     await update.message.reply_text(
         "🍽️ *Menu Zone 6 Food*\n\n"
         "1️⃣ Burger + frites – 3 500 FCFA\n"
@@ -18,7 +32,9 @@ async def start(update, context):
             resize_keyboard=True
         )
     )
-    async def handle_order(update, context):
+
+
+async def handle_order(update, context):
     text = update.message.text
 
     if "Burger" in text:
@@ -63,17 +79,22 @@ async def finaliser_commande(update, context):
 
     context.user_data.clear()
 
+
+# -------- MAIN --------
+
 def main():
     if not TOKEN:
         raise RuntimeError("BOT_TOKEN manquant")
 
     app = ApplicationBuilder().token(TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("boutique", boutique))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_order))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, finaliser_commande))
+
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()
-    app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("boutique", boutique))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_order))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, finaliser_commande))
