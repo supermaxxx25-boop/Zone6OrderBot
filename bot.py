@@ -18,7 +18,7 @@ from telegram.ext import (
 # CONFIG
 # =========================
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = 8348647959  # ⚠️ ton ID Telegram
+ADMIN_ID = 8348647959  # ⚠️ remplace par TON ID
 
 PRODUITS = {
     "Burger": ("🍔 Burger + frites", 3500),
@@ -30,18 +30,18 @@ PRODUITS = {
 # START
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🛒 Ouvrir la boutique", callback_data="shop")],
-        [InlineKeyboardButton("🧺 Voir le panier", callback_data="voir_panier")]
-    ])
-
     context.user_data["panier"] = {}
+
+    clavier = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🛒 Boutique", callback_data="shop")],
+        [InlineKeyboardButton("🧺 Voir panier", callback_data="panier")]
+    ])
 
     await update.message.reply_text(
         "👋 Bienvenue sur *Zone 6 Food* 🍽️\n\n"
-        "Commande autant de plats que tu veux 👇",
+        "Ajoute plusieurs plats et gère ton panier 👇",
         parse_mode="Markdown",
-        reply_markup=keyboard
+        reply_markup=clavier
     )
 
 # =========================
@@ -58,10 +58,7 @@ async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.message.reply_text(
         "🍽️ *Menu*\n\n"
-        "🍔 Burger + frites – 3 500 FCFA\n"
-        "🍕 Pizza – 5 000 FCFA\n"
-        "🍚 Riz poulet – 4 000 FCFA\n\n"
-        "👉 Clique pour ajouter au panier",
+        "Clique sur un plat pour l’ajouter au panier 👇",
         parse_mode="Markdown",
         reply_markup=menu
     )
@@ -73,16 +70,15 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     panier = context.user_data.setdefault("panier", {})
 
-    # Voir panier
     if "panier" in text.lower():
         await afficher_panier(update, context)
         return
 
-    for key, (nom, prix) in PRODUITS.items():
+    for key in PRODUITS:
         if key in text:
             panier[key] = panier.get(key, 0) + 1
             await update.message.reply_text(
-                f"✅ {nom} ajouté au panier\n"
+                f"✅ {PRODUITS[key][0]} ajouté\n"
                 f"🔢 Quantité : {panier[key]}"
             )
             return
@@ -98,42 +94,72 @@ async def afficher_panier(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     texte = "🧺 *Ton panier :*\n\n"
+    boutons = []
     total = 0
 
     for key, qte in panier.items():
         nom, prix = PRODUITS[key]
-        sous_total = prix * qte
+        sous_total = qte * prix
         total += sous_total
+
         texte += f"{nom}\n🔢 {qte} × {prix} = {sous_total} FCFA\n\n"
+
+        boutons.append([
+            InlineKeyboardButton("➖", callback_data=f"moins_{key}"),
+            InlineKeyboardButton(f"{qte}", callback_data="noop"),
+            InlineKeyboardButton("➕", callback_data=f"plus_{key}"),
+            InlineKeyboardButton("❌", callback_data=f"del_{key}")
+        ])
 
     texte += f"💰 *Total : {total} FCFA*"
 
-    clavier = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Valider la commande", callback_data="valider")],
-        [InlineKeyboardButton("➕ Continuer les achats", callback_data="shop")]
-    ])
+    boutons.append([InlineKeyboardButton("✅ Valider la commande", callback_data="valider")])
+    boutons.append([InlineKeyboardButton("🛒 Continuer achats", callback_data="shop")])
 
     await update.message.reply_text(
         texte,
         parse_mode="Markdown",
-        reply_markup=clavier
+        reply_markup=InlineKeyboardMarkup(boutons)
     )
 
 # =========================
-# VALIDATION PANIER
+# BOUTONS PANIER
 # =========================
-async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def panier_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    context.user_data["step"] = "infos"
+    panier = context.user_data.get("panier", {})
 
-    await query.message.reply_text(
-        "📍 Envoie maintenant :\n"
-        "• Adresse\n"
-        "• Téléphone\n\n"
-        "💵 Paiement à la livraison"
-    )
+    if not panier:
+        return
+
+    data = query.data
+
+    if data.startswith("plus_"):
+        key = data.replace("plus_", "")
+        panier[key] += 1
+
+    elif data.startswith("moins_"):
+        key = data.replace("moins_", "")
+        if panier[key] > 1:
+            panier[key] -= 1
+
+    elif data.startswith("del_"):
+        key = data.replace("del_", "")
+        panier.pop(key, None)
+
+    elif data == "valider":
+        context.user_data["step"] = "infos"
+        await query.message.reply_text(
+            "📍 Envoie maintenant :\n"
+            "• Adresse\n"
+            "• Téléphone\n\n"
+            "💵 Paiement à la livraison"
+        )
+        return
+
+    await afficher_panier(query.message, context)
 
 # =========================
 # INFOS CLIENT & CONFIRMATION
@@ -151,7 +177,7 @@ async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for key, qte in panier.items():
         nom, prix = PRODUITS[key]
-        sous_total = prix * qte
+        sous_total = qte * prix
         total += sous_total
         texte_panier += f"{nom} × {qte} = {sous_total} FCFA\n"
 
@@ -192,7 +218,8 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(shop, pattern="shop"))
-    app.add_handler(CallbackQueryHandler(valider, pattern="valider"))
+    app.add_handler(CallbackQueryHandler(afficher_panier, pattern="panier"))
+    app.add_handler(CallbackQueryHandler(panier_buttons))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, messages))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, infos_client))
 
