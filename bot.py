@@ -12,13 +12,13 @@ from telegram.ext import (
     filters,
 )
 
-# ======================
-# CONFIG
-# ======================
-TOKEN = os.getenv("BOT_TOKEN")
+# =========================
+# CONFIGURATION
+# =========================
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = os.getenv("ADMIN_ID")
 
-if not TOKEN:
+if not BOT_TOKEN:
     raise RuntimeError("❌ BOT_TOKEN manquant")
 
 if not ADMIN_ID:
@@ -26,9 +26,9 @@ if not ADMIN_ID:
 
 ADMIN_ID = int(ADMIN_ID)
 
-# ======================
+# =========================
 # /start
-# ======================
+# =========================
 async def start(update, context):
     keyboard = InlineKeyboardMarkup([
         [
@@ -41,69 +41,77 @@ async def start(update, context):
         ]
     ])
 
-    await update.message.reply_text(
-        "🍽️ *Zone 6 Food*\n\n"
-        "Clique sur le bouton ci-dessous pour commander 👇",
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=(
+            "🍽️ *Zone 6 Food*\n\n"
+            "Clique sur le bouton ci-dessous pour commander 👇"
+        ),
         parse_mode="Markdown",
         reply_markup=keyboard
     )
 
-# ======================
-# RÉCEPTION MINI APP
-# ======================
+# =========================
+# RÉCEPTION DES DONNÉES MINI APP
+# =========================
 async def webapp_data(update, context):
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+
     try:
         data = update.message.web_app_data.data
         panier = json.loads(data)
-    except Exception as e:
-        await update.message.reply_text("❌ Erreur lors de la réception de la commande.")
+    except Exception:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="❌ Erreur lors de la réception de la commande."
+        )
         return
 
-    user = update.effective_user
+    # -------- Confirmation client --------
+    message_client = "✅ *Commande confirmée !*\n\n"
 
-    # -------- Message client --------
-    texte_client = "✅ *Commande confirmée !*\n\n"
     for plat, qte in panier.items():
-        texte_client += f"• {plat} × {qte}\n"
+        message_client += f"• {plat} × {qte}\n"
 
-    texte_client += "\n💵 Paiement à la livraison\n⏱️ Livraison en cours"
+    message_client += "\n💵 Paiement à la livraison\n⏱️ Livraison en cours"
 
-    await update.message.reply_text(
-        texte_client,
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=message_client,
         parse_mode="Markdown"
     )
 
-    # -------- Message admin --------
-    texte_admin = (
+    # -------- Notification admin --------
+    message_admin = (
         "🧾 *Nouvelle commande Mini App*\n\n"
         f"👤 Client : {user.first_name or 'Inconnu'}\n"
         f"🆔 ID client : `{user.id}`\n\n"
     )
 
     for plat, qte in panier.items():
-        texte_admin += f"• {plat} × {qte}\n"
+        message_admin += f"• {plat} × {qte}\n"
 
     await context.bot.send_message(
         chat_id=ADMIN_ID,
-        text=texte_admin,
+        text=message_admin,
         parse_mode="Markdown"
     )
 
-# ======================
+# =========================
 # MAIN
-# ======================
+# =========================
 def main():
-    app = ApplicationBuilder().token(TOKEN).build()
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Commandes
     app.add_handler(CommandHandler("start", start))
 
-    # Réception données Mini App (CRITIQUE)
+    # Handler CRITIQUE pour Mini App
     app.add_handler(
         MessageHandler(filters.StatusUpdate.WEB_APP_DATA, webapp_data)
     )
 
-    print("🤖 Bot lancé et prêt")
+    print("🤖 Bot lancé avec succès")
     app.run_polling()
 
 if __name__ == "__main__":
