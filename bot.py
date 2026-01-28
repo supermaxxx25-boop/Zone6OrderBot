@@ -1,3 +1,4 @@
+print("🔥 PYTHON SE LANCE")
 import os
 import uuid
 import logging
