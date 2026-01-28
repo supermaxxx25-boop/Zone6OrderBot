@@ -63,12 +63,37 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================
-# MESSAGE PAR DEFAUT
+# MESSAGE TEXTE UNIQUE (FIX)
 # =====================
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # CAS 1 : attente infos client
     if context.user_data.get("attente_infos"):
+        panier = context.user_data.get("panier", {})
+        if not panier:
+            return
+
+        user = update.message.from_user
+        infos = update.message.text
+        total = calcul_total(panier)
+        order_id = str(uuid.uuid4())[:8]
+
+        COMMANDES[order_id] = {
+            "client_id": user.id,
+            "client_nom": user.full_name,
+            "panier": panier.copy(),
+            "total": total,
+            "infos": infos
+        }
+
+        await update.message.reply_text(
+            "⏳ *Commande envoyée*\nZone6 va la confirmer rapidement 🙏",
+            parse_mode="Markdown"
+        )
+
+        context.user_data.clear()
         return
 
+    # CAS 2 : message normal
     await update.message.reply_text(
         "👋 Salut et bienvenue dans la Zone6,\n🛒 Tu peux commander ici 👇",
         reply_markup=InlineKeyboardMarkup([
@@ -123,7 +148,7 @@ async def afficher_categorie(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
 # =====================
-# AJOUT AU PANIER
+# AJOUT PANIER
 # =====================
 async def ajouter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -187,7 +212,7 @@ async def afficher_panier(q, context):
     )
 
 # =====================
-# VALIDER COMMANDE
+# VALIDER
 # =====================
 async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -199,37 +224,6 @@ async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📍 *Merci de préciser :*\n• Adresse de livraison\n• Téléphone",
         parse_mode="Markdown"
     )
-
-# =====================
-# INFOS CLIENT (IMPORTANT)
-# =====================
-async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.user_data.get("attente_infos"):
-        return
-
-    panier = context.user_data.get("panier", {})
-    if not panier:
-        return
-
-    user = update.message.from_user
-    infos = update.message.text
-    total = calcul_total(panier)
-    order_id = str(uuid.uuid4())[:8]
-
-    COMMANDES[order_id] = {
-        "client_id": user.id,
-        "client_nom": user.full_name,
-        "panier": panier.copy(),
-        "total": total,
-        "infos": infos
-    }
-
-    await update.message.reply_text(
-        "⏳ *Commande envoyée*\nZone6 va la confirmer rapidement 🙏",
-        parse_mode="Markdown"
-    )
-
-    context.user_data.clear()
 
 # =====================
 # UTILS
@@ -244,21 +238,14 @@ def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-
     app.add_handler(CallbackQueryHandler(boutique, "^boutique$"))
     app.add_handler(CallbackQueryHandler(afficher_categorie, "^cat_"))
     app.add_handler(CallbackQueryHandler(ajouter, "^add_"))
     app.add_handler(CallbackQueryHandler(panier_handler, "^panier$"))
     app.add_handler(CallbackQueryHandler(valider, "^valider$"))
 
-    # 🔑 CORRECTION CRITIQUE (ne pas enlever)
-    app.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, infos_client),
-        block=False
-    )
-    app.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler)
-    )
+    # ✅ UN SEUL handler texte (clé de stabilité)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
     print("🤖 Zone 6 Food — Bot actif")
     app.run_polling()
