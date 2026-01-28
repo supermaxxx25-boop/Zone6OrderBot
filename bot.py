@@ -86,6 +86,17 @@ async def ajouter(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =====================
 # PANIER
 # =====================
+# =====================
+# PANIER (HANDLER)
+# =====================
+async def panier_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await afficher_panier(query, context)
+
+# =====================
+# AFFICHAGE PANIER
+# =====================
 async def afficher_panier(query, context):
     panier = context.user_data.get("panier", {})
 
@@ -113,6 +124,12 @@ async def afficher_panier(query, context):
         InlineKeyboardButton("✅ Valider la commande", callback_data="valider"),
         InlineKeyboardButton("⬅️ Retour menu", callback_data="boutique")
     ])
+
+    await query.edit_message_text(
+        texte,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(clavier)
+    )
 
     await query.edit_message_text(
         texte,
