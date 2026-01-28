@@ -46,8 +46,7 @@ MENU = {k: v for c in CATEGORIES.values() for k, v in c["produits"].items()}
 # =====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 Bienvenue chez *Zone6 Food* 🍽️",
-        parse_mode="Markdown",
+        "👋 Bienvenue dans la Zone6 👽,\n🛒 Tu peux commander ici 👇",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🛍️ Ouvrir la boutique", callback_data="boutique")]
         ])
