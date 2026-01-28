@@ -8,18 +8,27 @@ from telegram.ext import (
     CallbackQueryHandler,
     MessageHandler,
     ContextTypes,
-    filters
+    filters,
 )
 
 # =====================
-# LOGS
+# LOGGING (IMPORTANT POUR RAILWAY)
 # =====================
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+print("🚀 BOT DEMARRE")
 
 # =====================
 # CONFIG
 # =====================
 TOKEN = os.getenv("BOT_TOKEN")
+if not TOKEN:
+    raise RuntimeError("BOT_TOKEN manquant")
+
 ADMIN_ID = 8348647959
 DEVISE = "€"
 
@@ -49,6 +58,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
+
     context.user_data.setdefault("panier", {})
 
     await q.edit_message_text(
@@ -61,10 +71,10 @@ async def boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("🍔 Burger", callback_data="add_burger"),
-                InlineKeyboardButton("🍕 Pizza", callback_data="add_pizza")
+                InlineKeyboardButton("🍕 Pizza", callback_data="add_pizza"),
             ],
             [InlineKeyboardButton("🍛 Riz", callback_data="add_riz")],
-            [InlineKeyboardButton("🛒 Voir mon panier", callback_data="panier")]
+            [InlineKeyboardButton("🛒 Voir mon panier", callback_data="panier")],
         ])
     )
 
@@ -116,7 +126,7 @@ async def afficher_panier(q, context):
         clavier.append([
             InlineKeyboardButton("➖", callback_data=f"moins_{cle}"),
             InlineKeyboardButton("➕", callback_data=f"plus_{cle}"),
-            InlineKeyboardButton("🗑️ Retirer", callback_data=f"del_{cle}")
+            InlineKeyboardButton("🗑️ Retirer", callback_data=f"del_{cle}"),
         ])
 
     total = calcul_total(panier)
@@ -158,6 +168,7 @@ async def modifier_panier(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
+
     context.user_data["attente_infos"] = True
 
     await q.edit_message_text(
@@ -195,26 +206,23 @@ async def traiter_infos_client(update: Update, context: ContextTypes.DEFAULT_TYP
     COMMANDES[order_id] = {
         "client_id": user.id,
         "panier": panier.copy(),
-        "statut": "en_attente"
+        "statut": "en_attente",
     }
 
-    # RÉCAP CLIENT
+    # CLIENT
     await update.message.reply_text(
         "📋 *Récapitulatif de ta commande*\n\n"
         f"{resume_panier(panier)}\n\n"
         f"💰 *Total : {total} €*\n"
         f"🆔 *Commande :* `{order_id}`\n\n"
-        "⏳ En attente de validation par Zone 6 Food",
+        "⏳ En attente de validation",
         parse_mode="Markdown"
     )
 
-    # 🔗 PSEUDO TELEGRAM CLIQUABLE
-    if user.username:
-        contact = f"@{user.username}"
-    else:
-        contact = f"[Ouvrir le profil](tg://user?id={user.id})"
+    # CONTACT CLIQUABLE
+    contact = f"@{user.username}" if user.username else f"[Profil](tg://user?id={user.id})"
 
-    # 🔴 ADMIN
+    # ADMIN
     await context.bot.send_message(
         ADMIN_ID,
         f"🆕 *NOUVELLE COMMANDE*\n"
@@ -228,7 +236,7 @@ async def traiter_infos_client(update: Update, context: ContextTypes.DEFAULT_TYP
         reply_markup=InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("✅ Accepter", callback_data=f"admin_accept_{order_id}"),
-                InlineKeyboardButton("❌ Refuser", callback_data=f"admin_refuse_{order_id}")
+                InlineKeyboardButton("❌ Refuser", callback_data=f"admin_refuse_{order_id}"),
             ]
         ])
     )
@@ -236,7 +244,7 @@ async def traiter_infos_client(update: Update, context: ContextTypes.DEFAULT_TYP
     context.user_data.clear()
 
 # =====================
-# ADMIN : ACCEPTER
+# ADMIN ACTIONS
 # =====================
 async def admin_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -251,23 +259,12 @@ async def admin_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         cmd["client_id"],
-        "✅ *Ta commande est acceptée !*\n👨‍🍳 Elle est en préparation.",
+        "✅ *Commande acceptée !*\n👨‍🍳 En préparation.",
         parse_mode="Markdown"
     )
 
-    await q.edit_message_reply_markup(
-        reply_markup=InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("👨‍🍳 En préparation", callback_data=f"statut_prep_{order_id}"),
-                InlineKeyboardButton("🛵 En livraison", callback_data=f"statut_livraison_{order_id}")
-            ],
-            [InlineKeyboardButton("✅ Livrée", callback_data=f"statut_livree_{order_id}")]
-        ])
-    )
+    await q.edit_message_reply_markup(reply_markup=None)
 
-# =====================
-# ADMIN : REFUSER
-# =====================
 async def admin_refuse(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
@@ -277,39 +274,13 @@ async def admin_refuse(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not cmd:
         return
 
-    cmd["statut"] = "refusee"
-
     await context.bot.send_message(
         cmd["client_id"],
-        "❌ *Ta commande a été refusée.*\n🙏 Désolé pour le désagrément.",
+        "❌ *Commande refusée.*",
         parse_mode="Markdown"
     )
 
     await q.edit_message_reply_markup(reply_markup=None)
-
-# =====================
-# STATUT ADMIN
-# =====================
-async def statut_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-
-    _, statut, order_id = q.data.split("_")
-    cmd = COMMANDES.get(order_id)
-    if not cmd or cmd["statut"] != "confirmee":
-        return
-
-    messages = {
-        "prep": "👨‍🍳 *Commande en préparation*",
-        "livraison": "🛵 *Commande en livraison*",
-        "livree": "🎉 *Commande livrée*"
-    }
-
-    await context.bot.send_message(
-        cmd["client_id"],
-        messages[statut],
-        parse_mode="Markdown"
-    )
 
 # =====================
 # UTILS
@@ -337,10 +308,9 @@ def main():
     app.add_handler(CallbackQueryHandler(valider, "^valider$"))
     app.add_handler(CallbackQueryHandler(admin_accept, "^admin_accept_"))
     app.add_handler(CallbackQueryHandler(admin_refuse, "^admin_refuse_"))
-    app.add_handler(CallbackQueryHandler(statut_handler, "^statut_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
-    print("🤖 Zone 6 Food — bot opérationnel")
+    logger.info("🤖 Zone 6 Food — bot opérationnel")
     app.run_polling()
 
 if __name__ == "__main__":
