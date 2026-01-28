@@ -198,12 +198,18 @@ async def traiter_infos_client(update: Update, context: ContextTypes.DEFAULT_TYP
         "statut": "en_attente"
     }
 
-    await update.message.reply_text(
-        "⏳ *Commande envoyée*\n📲 En attente de validation par Zone6",
-        parse_mode="Markdown"
+    # ✅ RÉCAP CLIENT
+    recap = (
+        "📋 *Récapitulatif de ta commande*\n\n"
+        f"{resume_panier(panier)}\n\n"
+        f"💰 *Total : {total} €*\n"
+        f"🆔 *Commande :* `{order_id}`\n\n"
+        "⏳ En attente de validation par Zone 6 Food"
     )
 
-    # 🔴 ADMIN — UNIQUEMENT ACCEPTER / REFUSER
+    await update.message.reply_text(recap, parse_mode="Markdown")
+
+    # 🔴 ADMIN : accepter / refuser
     await context.bot.send_message(
         ADMIN_ID,
         f"🆕 *NOUVELLE COMMANDE*\n"
@@ -238,11 +244,10 @@ async def admin_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         cmd["client_id"],
-        "✅ *Votre commande a été acceptée !*\n👨‍🍳 Elle est en préparation.",
+        "✅ *Ta commande est acceptée !*\n👨‍🍳 Elle est en préparation.",
         parse_mode="Markdown"
     )
 
-    # 🔵 AFFICHER LES STATUTS APRÈS ACCEPTATION
     await q.edit_message_reply_markup(
         reply_markup=InlineKeyboardMarkup([
             [
@@ -269,7 +274,7 @@ async def admin_refuse(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         cmd["client_id"],
-        "❌ *Votre commande a été refusée.*\n🙏 Désolé pour le désagrément.",
+        "❌ *Ta commande a été refusée.*\n🙏 Désolé pour le désagrément.",
         parse_mode="Markdown"
     )
 
