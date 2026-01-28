@@ -198,22 +198,29 @@ async def traiter_infos_client(update: Update, context: ContextTypes.DEFAULT_TYP
         "statut": "en_attente"
     }
 
-    # ✅ RÉCAP CLIENT
-    recap = (
+    # RÉCAP CLIENT
+    await update.message.reply_text(
         "📋 *Récapitulatif de ta commande*\n\n"
         f"{resume_panier(panier)}\n\n"
         f"💰 *Total : {total} €*\n"
         f"🆔 *Commande :* `{order_id}`\n\n"
-        "⏳ En attente de validation par Zone 6 Food"
+        "⏳ En attente de validation par Zone 6 Food",
+        parse_mode="Markdown"
     )
 
-    await update.message.reply_text(recap, parse_mode="Markdown")
+    # 🔗 PSEUDO TELEGRAM CLIQUABLE
+    if user.username:
+        contact = f"@{user.username}"
+    else:
+        contact = f"[Ouvrir le profil](tg://user?id={user.id})"
 
-    # 🔴 ADMIN : accepter / refuser
+    # 🔴 ADMIN
     await context.bot.send_message(
         ADMIN_ID,
         f"🆕 *NOUVELLE COMMANDE*\n"
         f"🆔 `{order_id}`\n\n"
+        f"👤 *Client :* {user.full_name}\n"
+        f"📎 *Contact :* {contact}\n\n"
         f"{resume_panier(panier)}\n"
         f"💰 *Total : {total} €*\n\n"
         f"📍 Infos client :\n{infos}",
