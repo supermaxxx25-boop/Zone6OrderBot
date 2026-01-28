@@ -23,7 +23,7 @@ MENU = {
     "riz": {"nom": "🍛 Riz sauce poulet", "prix": 8},
 }
 
-COMMANDES = {}  # order_id -> commande figée
+COMMANDES = {}
 
 # =====================
 # START
@@ -156,7 +156,7 @@ async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await q.answer()
 
     await q.edit_message_text(
-        "📍 Envoie maintenant :\n"
+        "📍 *Merci de préciser :*\n"
         "• Adresse de livraison\n"
         "• Téléphone",
         parse_mode="Markdown"
@@ -176,7 +176,6 @@ async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
     infos = update.message.text
     order_id = str(uuid.uuid4())[:8]
 
-    # On fige la commande
     COMMANDES[order_id] = {
         "client_id": user.id,
         "client_nom": user.full_name,
@@ -186,13 +185,14 @@ async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # CLIENT
     await update.message.reply_text(
-        f"✅ *Commande confirmée*\n"
-        f"🆔 `{order_id}`\n\n"
-        "👨‍🍳 *Statut : En préparation*",
+        "✅ *Commande confirmée*\n\n"
+        "👨‍🍳 *Statut : En préparation*\n\n"
+        "📦 Notre équipe prépare ta commande.\n"
+        "🙏 Merci pour ta confiance !",
         parse_mode="Markdown"
     )
 
-    # ADMIN (BON DÉTAILLÉ)
+    # ADMIN
     texte_admin = (
         f"🆕 *NOUVELLE COMMANDE*\n"
         f"🆔 `{order_id}`\n\n"
@@ -269,7 +269,7 @@ def main():
     app.add_handler(CallbackQueryHandler(statut_handler, "^statut_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, infos_client))
 
-    print("🤖 Zone 6 Food — VERSION STABLE")
+    print("🤖 Zone 6 Food — version finale")
     app.run_polling()
 
 if __name__ == "__main__":
