@@ -45,7 +45,6 @@ CATEGORIES = {
     }
 }
 
-# MENU global (utilisé par panier / admin)
 MENU = {
     key: prod
     for cat in CATEGORIES.values()
@@ -67,7 +66,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # MESSAGE PAR DEFAUT
 # =====================
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Ne répond que si on n'attend PAS les infos client
     if context.user_data.get("attente_infos"):
         return
 
@@ -79,7 +77,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================
-# BOUTIQUE (CATEGORIES)
+# BOUTIQUE
 # =====================
 async def boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -164,7 +162,7 @@ async def afficher_panier(q, context):
 
     for cle, qte in panier.items():
         p = MENU[cle]
-        texte += f"{p['nom']}\n➜ Quantité : {qte}\n➜ Sous-total : {p['prix'] * qte} €\n\n"
+        texte += f"{p['nom']}\n➜ Quantité : {qte}\n➜ Sous-total : {p['prix']*qte} €\n\n"
 
         clavier.append([
             InlineKeyboardButton("➖", callback_data=f"moins_{cle}"),
@@ -185,33 +183,11 @@ async def afficher_panier(q, context):
     )
 
 # =====================
-# MODIFIER PANIER
-# =====================
-async def modifier_panier(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-
-    action, cle = q.data.split("_")
-    panier = context.user_data["panier"]
-
-    if action == "plus":
-        panier[cle] += 1
-    elif action == "moins":
-        panier[cle] -= 1
-        if panier[cle] <= 0:
-            del panier[cle]
-    elif action == "del":
-        del panier[cle]
-
-    await afficher_panier(q, context)
-
-# =====================
-# VALIDER COMMANDE
+# VALIDER
 # =====================
 async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-
     context.user_data["attente_infos"] = True
 
     await q.edit_message_text(
@@ -235,125 +211,23 @@ async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
     COMMANDES[order_id] = {
         "client_id": user.id,
         "client_nom": user.full_name,
-        "client_username": user.username,
         "panier": panier.copy(),
         "total": total,
         "statut": "en_attente"
     }
 
     await update.message.reply_text(
-        "⏳ *Commande envoyée*\n\nZone6 doit confirmer la commande 🙏",
+        "⏳ *Commande envoyée*\nZone6 doit confirmer 🙏",
         parse_mode="Markdown"
-    )
-
-    pseudo = f"@{user.username}" if user.username else "Non défini"
-
-    await context.bot.send_message(
-        ADMIN_ID,
-        f"🆕 *NOUVELLE COMMANDE*\n"
-        f"🆔 `{order_id}`\n\n"
-        f"👤 Client : {user.full_name}\n"
-        f"🔗 {pseudo}\n\n"
-        f"{resume_panier(panier)}"
-        f"💰 *Total : {total} €*\n\n"
-        f"📍 Infos client :\n{infos}",
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("✅ Accepter", callback_data=f"admin_accept_{order_id}"),
-                InlineKeyboardButton("❌ Refuser", callback_data=f"admin_refuse_{order_id}")
-            ]
-        ])
     )
 
     context.user_data.clear()
-
-# =====================
-# ADMIN ACTIONS
-# =====================
-async def admin_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-
-    order_id = q.data.replace("admin_accept_", "")
-    cmd = COMMANDES.get(order_id)
-    if not cmd:
-        return
-
-    cmd["statut"] = "confirmee"
-
-    await context.bot.send_message(
-        cmd["client_id"],
-        "✅ *Ta commande est acceptée !*",
-        parse_mode="Markdown"
-    )
-
-    await q.edit_message_reply_markup(
-        reply_markup=InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("👨‍🍳 Préparation", callback_data=f"statut_prep_{order_id}"),
-                InlineKeyboardButton("🛵 Livraison", callback_data=f"statut_livraison_{order_id}")
-            ],
-            [InlineKeyboardButton("✅ Livrée", callback_data=f"statut_livree_{order_id}")]
-        ])
-    )
-
-async def admin_refuse(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-
-    order_id = q.data.replace("admin_refuse_", "")
-    cmd = COMMANDES.get(order_id)
-    if not cmd:
-        return
-
-    await context.bot.send_message(
-        cmd["client_id"],
-        "❌ *Commande refusée.*",
-        parse_mode="Markdown"
-    )
-
-    del COMMANDES[order_id]
-    await q.edit_message_reply_markup(reply_markup=None)
-
-# =====================
-# STATUT COMMANDE
-# =====================
-async def statut_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-
-    _, statut, order_id = q.data.split("_")
-    cmd = COMMANDES.get(order_id)
-    if not cmd:
-        return
-
-    messages = {
-        "prep": "👨‍🍳 *Commande en préparation*",
-        "livraison": "🛵 *Commande en livraison*",
-        "livree": "🎉 *Commande livrée — bon appétit !*"
-    }
-
-    await context.bot.send_message(
-        cmd["client_id"],
-        messages[statut],
-        parse_mode="Markdown"
-    )
-
-    cmd["statut"] = statut
 
 # =====================
 # UTILS
 # =====================
 def calcul_total(panier):
     return sum(MENU[k]["prix"] * v for k, v in panier.items())
-
-def resume_panier(panier):
-    texte = "🧾 *Commande*\n"
-    for k, v in panier.items():
-        p = MENU[k]
-        texte += f"• {p['nom']} x{v} = {p['prix'] * v} €\n"
-    return texte + "\n"
 
 # =====================
 # MAIN
@@ -366,14 +240,13 @@ def main():
     app.add_handler(CallbackQueryHandler(afficher_categorie, "^cat_"))
     app.add_handler(CallbackQueryHandler(ajouter, "^add_"))
     app.add_handler(CallbackQueryHandler(panier_handler, "^panier$"))
-    app.add_handler(CallbackQueryHandler(modifier_panier, "^(plus|moins|del)_"))
     app.add_handler(CallbackQueryHandler(valider, "^valider$"))
-    app.add_handler(CallbackQueryHandler(statut_handler, "^statut_"))
-    app.add_handler(CallbackQueryHandler(admin_accept, "^admin_accept_"))
-    app.add_handler(CallbackQueryHandler(admin_refuse, "^admin_refuse_"))
 
-    # ORDRE IMPORTANT
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, infos_client))
+    # 🔑 CORRECTION CLÉ
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, infos_client),
+        block=False
+    )
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
     print("🤖 Zone 6 Food — Bot actif")
