@@ -14,110 +14,140 @@ from produits import PRODUITS
 from database import init_db, get_db
 
 TOKEN = os.getenv("TOKEN")
-
-# ⚠️ REMPLACE par TON ID Telegram (obligatoire)
-ADMIN_ID = 8348647959
+ADMIN_ID = 123456789  # ⬅️ remplace par TON ID Telegram
 
 
-# --- START ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("🛒 Boutique", callback_data="boutique")],
         [InlineKeyboardButton("🧺 Mon panier", callback_data="panier")],
     ]
     await update.message.reply_text(
-        "👋 Bienvenue sur la boutique ZONE 6\n\nPaiement à la livraison 🇫🇷\n\nChoisis une option 👇",
+        "👋 Bienvenue sur la boutique ZONE 6\nPaiement à la livraison 🇫🇷",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
 
-# --- BOUTIQUE ---
 async def boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     for pid, p in PRODUITS.items():
-        keyboard = [
-            [InlineKeyboardButton("➕ Ajouter au panier", callback_data=f"add_{pid}")]
-        ]
         await query.message.reply_photo(
             photo=p["image"],
             caption=f"🛍️ {p['nom']}\n💶 {p['prix']} €",
-            reply_markup=InlineKeyboardMarkup(keyboard),
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("➕ Ajouter au panier", callback_data=f"add_{pid}")]]
+            ),
         )
 
 
-# --- AJOUT PANIER ---
 async def add_panier(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    pid = int(query.data.split("_")[1])
     panier = context.user_data.get("panier", [])
-    panier.append(pid)
+    panier.append(int(query.data.split("_")[1]))
     context.user_data["panier"] = panier
 
     await query.message.reply_text("✅ Produit ajouté au panier")
 
 
-# --- PANIER ---
 async def panier(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     panier = context.user_data.get("panier", [])
     if not panier:
-        await query.message.reply_text("🧺 Ton panier est vide")
+        await query.message.reply_text("🧺 Panier vide")
         return
 
-    total = 0
-    recap = ""
-    for pid in panier:
-        p = PRODUITS[pid]
-        recap += f"- {p['nom']} ({p['prix']}€)\n"
-        total += p["prix"]
-
-    keyboard = [
-        [InlineKeyboardButton("✅ Commander", callback_data="commander")]
-    ]
+    total = sum(PRODUITS[p]["prix"] for p in panier)
+    recap = "\n".join(f"- {PRODUITS[p]['nom']}" for p in panier)
 
     await query.message.reply_text(
-        f"🧺 Ton panier :\n{recap}\n💶 Total : {total} €",
-        reply_markup=InlineKeyboardMarkup(keyboard),
+        f"🧾 Panier :\n{recap}\n\n💶 Total : {total} €",
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("✅ Commander", callback_data="commander")]]
+        ),
     )
 
 
-# --- COMMANDER ---
 async def commander(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data["step"] = "nom"
-    await query.message.reply_text("✍️ Quel est ton nom complet ?")
+    await query.message.reply_text("✍️ Ton nom complet ?")
 
 
-# --- GESTION TEXTE ---
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     step = context.user_data.get("step")
 
     if step == "nom":
         context.user_data["nom"] = update.message.text
         context.user_data["step"] = "tel"
-        await update.message.reply_text("📞 Ton numéro de téléphone ?")
+        await update.message.reply_text("📞 Ton téléphone ?")
 
     elif step == "tel":
         context.user_data["tel"] = update.message.text
         context.user_data["step"] = "adresse"
-        await update.message.reply_text("📍 Ton adresse complète (France) ?")
+        await update.message.reply_text("📍 Ton adresse ?")
 
     elif step == "adresse":
         context.user_data["adresse"] = update.message.text
         await enregistrer_commande(update, context)
 
 
-# --- ENREGISTRER COMMANDE ---
-async def enregistrer_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def enregistrer_commande(update, context):
     panier = context.user_data.get("panier", [])
-    total = sum(PRODUITS[pid]["prix"] for pid in panier)
-    recap = ", ".join(PRODUITS[pid]["nom"] for pid in panier)
+    total = sum(PRODUITS[p]["prix"] for p in panier)
+    recap = ", ".join(PRODUITS[p]["nom"] for p in panier)
+    numero = f"CMD-{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
-    numero
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO commandes (numero, client, telephone, adresse, recap, total, statut, chat_id) VALUES (?,?,?,?,?,?,?,?)",
+        (
+            numero,
+            context.user_data["nom"],
+            context.user_data["tel"],
+            context.user_data["adresse"],
+            recap,
+            total,
+            "En attente",
+            update.message.chat_id,
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    await update.message.reply_text(
+        f"✅ Commande confirmée\n📦 {numero}\n💶 {total} €\n🚚 Paiement à la livraison"
+    )
+
+    await context.bot.send_message(
+        ADMIN_ID,
+        f"🆕 {numero}\n👤 {context.user_data['nom']}\n📞 {context.user_data['tel']}\n📍 {context.user_data['adresse']}\n🛍️ {recap}\n💶 {total} €",
+    )
+
+    context.user_data.clear()
+
+
+def main():
+    init_db()
+    app = ApplicationBuilder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(boutique, pattern="^boutique$"))
+    app.add_handler(CallbackQueryHandler(panier, pattern="^panier$"))
+    app.add_handler(CallbackQueryHandler(add_panier, pattern="^add_"))
+    app.add_handler(CallbackQueryHandler(commander, pattern="^commander$"))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+
+    print("Bot started")
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
