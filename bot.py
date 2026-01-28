@@ -14,12 +14,12 @@ from handlers.commande import register_commande
 # =========================
 # CONFIGURATION
 # =========================
-TOKEN = os.getenv("8430752899:AAE-UEOqtwvSbU20BlP9-ApGwln8WY9R1x4")
-ADMIN_ID = 8348647959  # ton ID admin
+TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "8348647959"))
 
 
 # =========================
-# SERVEUR HTTP (Railway Worker)
+# SERVEUR HTTP (Railway)
 # =========================
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -32,7 +32,8 @@ class HealthHandler(BaseHTTPRequestHandler):
 
 
 def run_server():
-    server = HTTPServer(("0.0.0.0", 8080), HealthHandler)
+    port = int(os.getenv("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), HealthHandler)
     server.serve_forever()
 
 
@@ -41,12 +42,12 @@ def run_server():
 # =========================
 def main():
     if not TOKEN:
-        raise RuntimeError("❌ TOKEN manquant (variable d'environnement)")
+        raise RuntimeError("❌ BOT_TOKEN manquant dans les variables d'environnement")
 
     print("🔧 Initialisation de la base de données...")
     init_db()
 
-    print("🌐 Démarrage du serveur HTTP Railway...")
+    print("🌐 Démarrage du serveur HTTP...")
     threading.Thread(target=run_server, daemon=True).start()
 
     print("🤖 Lancement du bot Telegram...")
