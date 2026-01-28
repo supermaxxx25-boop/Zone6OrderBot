@@ -322,8 +322,8 @@ async def statut_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     messages = {
         "prep": "👨‍🍳 *Commande en préparation*",
-        "livraison": "🛵 *Commande en livraison*",
-        "livree": "🎉 *Commande livrée*"
+        "livraison": "🏎️ *Ta commande est en route*",
+        "livree": "🎉 *Commande livrée, merci pour ta confiance 🙏*"
     }
 
     await context.bot.send_message(
