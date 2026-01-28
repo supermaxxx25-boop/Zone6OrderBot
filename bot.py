@@ -132,7 +132,7 @@ async def afficher_panier(q, context):
     )
 
 # =====================
-# MODIFIER PANIER (CORRIGÉ)
+# MODIFIER PANIER
 # =====================
 async def modifier_panier(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -203,6 +203,7 @@ async def traiter_infos_client(update: Update, context: ContextTypes.DEFAULT_TYP
         parse_mode="Markdown"
     )
 
+    # 🔴 ADMIN — UNIQUEMENT ACCEPTER / REFUSER
     await context.bot.send_message(
         ADMIN_ID,
         f"🆕 *NOUVELLE COMMANDE*\n"
@@ -215,12 +216,7 @@ async def traiter_infos_client(update: Update, context: ContextTypes.DEFAULT_TYP
             [
                 InlineKeyboardButton("✅ Accepter", callback_data=f"admin_accept_{order_id}"),
                 InlineKeyboardButton("❌ Refuser", callback_data=f"admin_refuse_{order_id}")
-            ],
-            [
-                InlineKeyboardButton("👨‍🍳 En préparation", callback_data=f"statut_prep_{order_id}"),
-                InlineKeyboardButton("🛵 En livraison", callback_data=f"statut_livraison_{order_id}")
-            ],
-            [InlineKeyboardButton("✅ Livrée", callback_data=f"statut_livree_{order_id}")]
+            ]
         ])
     )
 
@@ -246,7 +242,16 @@ async def admin_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-    await q.edit_message_reply_markup(reply_markup=None)
+    # 🔵 AFFICHER LES STATUTS APRÈS ACCEPTATION
+    await q.edit_message_reply_markup(
+        reply_markup=InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("👨‍🍳 En préparation", callback_data=f"statut_prep_{order_id}"),
+                InlineKeyboardButton("🛵 En livraison", callback_data=f"statut_livraison_{order_id}")
+            ],
+            [InlineKeyboardButton("✅ Livrée", callback_data=f"statut_livree_{order_id}")]
+        ])
+    )
 
 # =====================
 # ADMIN : REFUSER
