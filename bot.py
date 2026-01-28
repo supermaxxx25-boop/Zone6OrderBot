@@ -1,16 +1,15 @@
 import os
 from telegram import (
+    Update,
     ReplyKeyboardMarkup,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    Update,
 )
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
-    ConversationHandler,
     ContextTypes,
     filters,
 )
@@ -19,133 +18,126 @@ from telegram.ext import (
 # CONFIG
 # =========================
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = 8348647959  # mets TON vrai ID
-
-# États de conversation
-CHOIX_PRODUIT, INFOS_CLIENT = range(2)
+ADMIN_ID = 8348647959  # ⚠️ remplace par TON vrai ID Telegram
 
 # =========================
 # START
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    bouton = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🛒 Ouvrir la boutique", callback_data="open_shop")]
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🛒 Ouvrir la boutique", callback_data="shop")]
     ])
 
     await update.message.reply_text(
         "👋 Bienvenue sur *Zone 6 Food* 🍽️\n\n"
         "Clique sur le bouton ci-dessous pour commander 👇",
         parse_mode="Markdown",
-        reply_markup=bouton
+        reply_markup=keyboard
     )
 
 # =========================
 # BOUTIQUE
 # =========================
-async def open_shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    clavier = ReplyKeyboardMarkup(
+    menu = ReplyKeyboardMarkup(
         [["🍔 Burger", "🍕 Pizza"], ["🍚 Riz poulet"]],
         resize_keyboard=True
     )
 
     await query.message.reply_text(
-        "🍽️ *Menu Zone 6 Food*\n\n"
+        "🍽️ *Menu*\n\n"
         "🍔 Burger + frites – 3 500 FCFA\n"
         "🍕 Pizza – 5 000 FCFA\n"
-        "🍚 Riz sauce poulet – 4 000 FCFA\n\n"
+        "🍚 Riz poulet – 4 000 FCFA\n\n"
         "👉 Choisis un plat",
         parse_mode="Markdown",
-        reply_markup=clavier
+        reply_markup=menu
     )
 
-    return CHOIX_PRODUIT
+    context.user_data["step"] = "choix"
 
 # =========================
-# CHOIX DU PRODUIT
+# GESTION DES MESSAGES
 # =========================
-async def choix_produit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
+    step = context.user_data.get("step")
 
-    produits = {
-        "Burger": ("Burger + frites", "3 500 FCFA"),
-        "Pizza": ("Pizza", "5 000 FCFA"),
-        "Riz": ("Riz sauce poulet", "4 000 FCFA"),
-    }
+    # ----- ÉTAPE 1 : choix du plat -----
+    if step == "choix":
+        produits = {
+            "Burger": ("Burger + frites", "3 500 FCFA"),
+            "Pizza": ("Pizza", "5 000 FCFA"),
+            "Riz": ("Riz poulet", "4 000 FCFA"),
+        }
 
-    for key, (produit, prix) in produits.items():
-        if key in text:
-            context.user_data["commande"] = produit
+        for key, (produit, prix) in produits.items():
+            if key in text:
+                context.user_data["produit"] = produit
+                context.user_data["prix"] = prix
+                context.user_data["step"] = "infos"
 
-            await update.message.reply_text(
-                f"🛒 *Commande :* {produit}\n"
-                f"💰 *Prix :* {prix}\n\n"
-                "📍 Envoie maintenant :\n"
-                "• Adresse\n"
-                "• Téléphone\n\n"
-                "💵 Paiement à la livraison",
-                parse_mode="Markdown"
-            )
-            return INFOS_CLIENT
+                await update.message.reply_text(
+                    f"🛒 *Commande :* {produit}\n"
+                    f"💰 *Prix :* {prix}\n\n"
+                    "📍 Envoie maintenant :\n"
+                    "• Adresse\n"
+                    "• Téléphone\n\n"
+                    "💵 Paiement à la livraison",
+                    parse_mode="Markdown"
+                )
+                return
 
-    await update.message.reply_text("❌ Merci de choisir un plat du menu.")
-    return CHOIX_PRODUIT
+        await update.message.reply_text("❌ Choisis un plat du menu.")
+        return
 
-# =========================
-# FINALISATION
-# =========================
-async def finaliser_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("🔥 FINALISER_COMMANDE APPELÉE")
-    infos = update.message.text
-    produit = context.user_data.get("commande")
+    # ----- ÉTAPE 2 : infos client -----
+    if step == "infos":
+        produit = context.user_data.get("produit")
+        prix = context.user_data.get("prix")
+        infos = text
 
-    # Client
-    await update.message.reply_text(
-        "✅ *Commande confirmée !*\n\n"
-        f"🍽️ Plat : {produit}\n"
-        f"📍 Infos : {infos}\n\n"
-        "💵 Paiement à la livraison\n"
-        "⏱️ Livraison en cours.\nMerci 🙏",
-        parse_mode="Markdown"
-    )
-
-    # Admin
-    await context.bot.send_message(
-        chat_id=ADMIN_ID,
-        text=(
-            "📦 *NOUVELLE COMMANDE*\n\n"
-            f"👤 Client : @{update.effective_user.username}\n"
+        # Confirmation client
+        await update.message.reply_text(
+            "✅ *Commande confirmée !*\n\n"
             f"🍽️ Plat : {produit}\n"
-            f"📍 Infos : {infos}"
-        ),
-        parse_mode="Markdown"
-    )
+            f"💰 Prix : {prix}\n"
+            f"📍 Infos : {infos}\n\n"
+            "⏱️ Livraison en cours\nMerci 🙏",
+            parse_mode="Markdown"
+        )
 
-    context.user_data.clear()
-    return ConversationHandler.END
+        # Message admin
+        await context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text=(
+                "📦 *NOUVELLE COMMANDE*\n\n"
+                f"👤 Client : @{update.effective_user.username}\n"
+                f"🍽️ Plat : {produit}\n"
+                f"💰 Prix : {prix}\n"
+                f"📍 Infos : {infos}"
+            ),
+            parse_mode="Markdown"
+        )
+
+        context.user_data.clear()
+        return
 
 # =========================
 # MAIN
 # =========================
 def main():
     if not TOKEN:
-        raise RuntimeError("BOT_TOKEN manquant")
+        raise RuntimeError("❌ BOT_TOKEN manquant")
 
     app = ApplicationBuilder().token(TOKEN).build()
 
-    conv_handler = ConversationHandler(
-        entry_points=[CallbackQueryHandler(open_shop, pattern="open_shop")],
-        states={
-            CHOIX_PRODUIT: [MessageHandler(filters.TEXT & ~filters.COMMAND, choix_produit)],
-            INFOS_CLIENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, finaliser_commande)],
-        },
-        fallbacks=[CommandHandler("start", start)],
-    )
-
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(conv_handler)
+    app.add_handler(CallbackQueryHandler(shop, pattern="shop"))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, messages))
 
     print("✅ Bot en ligne")
     app.run_polling()
