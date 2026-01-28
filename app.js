@@ -1,10 +1,14 @@
 let panier = {}
 
+// OBLIGATOIRE
+Telegram.WebApp.ready()
+
 function add(produit) {
   panier[produit] = (panier[produit] || 0) + 1
+
   Telegram.WebApp.showPopup({
-    title: "Ajouté",
-    message: produit + " ajouté au panier",
+    title: "Ajouté au panier",
+    message: produit + " ajouté",
     buttons: [{ type: "ok" }]
   })
 }
@@ -19,6 +23,7 @@ function envoyer() {
     return
   }
 
+  console.log("PANIER ENVOYÉ:", panier)
+
   Telegram.WebApp.sendData(JSON.stringify(panier))
-  Telegram.WebApp.close()
 }
