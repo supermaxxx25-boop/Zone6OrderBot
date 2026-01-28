@@ -183,7 +183,6 @@ async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "total": total
     }
 
-    # CLIENT
     await update.message.reply_text(
         "⏳ *Commande envoyée*\n\n"
         "📲 Zone6 doit confirmer la commande.\n"
@@ -191,7 +190,23 @@ async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-    # ADMIN
+    recap_client = (
+        "🧾 *Récapitulatif de ta commande*\n\n"
+        f"{resume_panier(panier)}\n"
+        f"💰 *Total : {total} €*\n\n"
+        "📍 *Infos fournies :*\n"
+        f"{infos}\n\n"
+        "⏳ En attente de confirmation par Zone6"
+    )
+
+    await update.message.reply_text(
+        recap_client,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("❌ Annuler ma commande", callback_data=f"cancel_{order_id}")]
+        ])
+    )
+
     texte_admin = (
         f"🆕 *NOUVELLE COMMANDE*\n"
         f"🆔 `{order_id}`\n\n"
@@ -216,6 +231,32 @@ async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     context.user_data.clear()
+
+# =====================
+# ANNULATION CLIENT
+# =====================
+async def annuler_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    _, order_id = q.data.split("_")
+    cmd = COMMANDES.get(order_id)
+    if not cmd:
+        await q.edit_message_text("⚠️ Cette commande n'existe plus.")
+        return
+
+    del COMMANDES[order_id]
+
+    await q.edit_message_text(
+        "❌ *Ta commande a été annulée avec succès.*",
+        parse_mode="Markdown"
+    )
+
+    await context.bot.send_message(
+        ADMIN_ID,
+        f"⚠️ *Commande annulée par le client*\n🆔 `{order_id}`",
+        parse_mode="Markdown"
+    )
 
 # =====================
 # ACCEPT / REFUSE
@@ -304,11 +345,12 @@ def main():
     app.add_handler(CallbackQueryHandler(panier_handler, "^panier$"))
     app.add_handler(CallbackQueryHandler(modifier_panier, "^(plus|moins|del)_"))
     app.add_handler(CallbackQueryHandler(valider, "^valider$"))
+    app.add_handler(CallbackQueryHandler(annuler_commande, "^cancel_"))
     app.add_handler(CallbackQueryHandler(decision_commande, "^(accept|refuse)_"))
     app.add_handler(CallbackQueryHandler(statut_handler, "^statut_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, infos_client))
 
-    print("🤖 Zone 6 Food — version finale")
+    print("🤖 Zone 6 Food — version finale + annulation client")
     app.run_polling()
 
 if __name__ == "__main__":
