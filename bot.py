@@ -69,12 +69,28 @@ async def finaliser_commande(update, context):
 
     infos = update.message.text
     produit = context.user_data["commande"]
+    user = update.effective_user
+
+    message_admin = (
+        "📦 *NOUVELLE COMMANDE*\n\n"
+        f"👤 Client : {user.full_name}\n"
+        f"🆔 ID : {user.id}\n"
+        f"🍽️ Plat : {produit}\n"
+        f"📍 Infos : {infos}\n"
+        "💵 Paiement : espèces à la livraison"
+    )
+
+    await context.bot.send_message(
+        chat_id=ADMIN_ID,
+        text=message_admin,
+        parse_mode="Markdown"
+    )
 
     await update.message.reply_text(
         "✅ *Commande confirmée !*\n\n"
-        f"🍽️ Plat : {produit}\n"
-        f"📍 Infos : {infos}\n\n"
-        "⏱️ Livraison en cours.\nMerci 🙏",
+        "📦 Elle a été transmise au restaurant.\n"
+        "⏱️ Livraison en cours.\n\n"
+        "Merci pour votre commande 🙏",
         parse_mode="Markdown"
     )
 
