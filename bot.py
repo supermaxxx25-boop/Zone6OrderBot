@@ -12,8 +12,19 @@ from telegram.ext import (
     filters,
 )
 
+# ======================
+# CONFIG
+# ======================
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID"))
+ADMIN_ID = os.getenv("ADMIN_ID")
+
+if not TOKEN:
+    raise RuntimeError("❌ BOT_TOKEN manquant")
+
+if not ADMIN_ID:
+    raise RuntimeError("❌ ADMIN_ID manquant")
+
+ADMIN_ID = int(ADMIN_ID)
 
 # ======================
 # /start
@@ -31,7 +42,8 @@ async def start(update, context):
     ])
 
     await update.message.reply_text(
-        "🍽️ *Zone 6 Food*\n\nClique pour commander 👇",
+        "🍽️ *Zone 6 Food*\n\n"
+        "Clique sur le bouton ci-dessous pour commander 👇",
         parse_mode="Markdown",
         reply_markup=keyboard
     )
@@ -40,25 +52,32 @@ async def start(update, context):
 # RÉCEPTION MINI APP
 # ======================
 async def webapp_data(update, context):
-    data = update.message.web_app_data.data
-    panier = json.loads(data)
+    try:
+        data = update.message.web_app_data.data
+        panier = json.loads(data)
+    except Exception as e:
+        await update.message.reply_text("❌ Erreur lors de la réception de la commande.")
+        return
 
     user = update.effective_user
 
-    # Message client
+    # -------- Message client --------
     texte_client = "✅ *Commande confirmée !*\n\n"
     for plat, qte in panier.items():
         texte_client += f"• {plat} × {qte}\n"
 
-    texte_client += "\n⏱️ Livraison en cours\n💵 Paiement à la livraison"
+    texte_client += "\n💵 Paiement à la livraison\n⏱️ Livraison en cours"
 
-    await update.message.reply_text(texte_client, parse_mode="Markdown")
+    await update.message.reply_text(
+        texte_client,
+        parse_mode="Markdown"
+    )
 
-    # Message admin
+    # -------- Message admin --------
     texte_admin = (
         "🧾 *Nouvelle commande Mini App*\n\n"
-        f"👤 Client : {user.first_name}\n"
-        f"🆔 ID : `{user.id}`\n\n"
+        f"👤 Client : {user.first_name or 'Inconnu'}\n"
+        f"🆔 ID client : `{user.id}`\n\n"
     )
 
     for plat, qte in panier.items():
@@ -74,17 +93,17 @@ async def webapp_data(update, context):
 # MAIN
 # ======================
 def main():
-    if not TOKEN:
-        raise RuntimeError("BOT_TOKEN manquant")
-
     app = ApplicationBuilder().token(TOKEN).build()
 
+    # Commandes
     app.add_handler(CommandHandler("start", start))
+
+    # Réception données Mini App (CRITIQUE)
     app.add_handler(
         MessageHandler(filters.StatusUpdate.WEB_APP_DATA, webapp_data)
     )
 
-    print("🤖 Bot lancé")
+    print("🤖 Bot lancé et prêt")
     app.run_polling()
 
 if __name__ == "__main__":
