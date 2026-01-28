@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>ZONE 6</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <style>
+    :root {
+      --bg: #0b0b0f;
+      --card: #181820;
+      --accent: #d4af37;
+      --text: #ffffff;
+      --muted: #9a9a9a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      padding: 20px;
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+
+    header span {
+      color: var(--accent);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      padding: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 22px;
+      padding: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.4);
+      transition: transform .2s ease;
+    }
+
+    .card:active {
+      transform: scale(0.97);
+    }
+
+    .card img {
+      width: 100%;
+      border-radius: 16px;
+      margin-bottom: 10px;
+    }
+
+    .name {
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    .price {
+      color: var(--accent);
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    button {
+      margin-top: 10px;
+      width: 100%;
+      padding: 10px;
+      border-radius: 14px;
+      border: none;
+      background: linear-gradient(135deg, #d4af37, #b8962e);
+      color: #000;
+      font-weight: 800;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>ZONE <span>6</span></header>
+
+<div class="grid" id="products"></div>
+
+<script>
+  const tg = window.Telegram.WebApp;
+  tg.expand();
+
+  const products = [
+    { id: 1, name: "Produit Prestige", price: 25, image: "https://via.placeholder.com/400" },
+    { id: 2, name: "Édition Limitée", price: 40, image: "https://via.placeholder.com/400" },
+    { id: 3, name: "Collection Luxe", price: 30, image: "https://via.placeholder.com/400" },
+    { id: 4, name: "Signature Z6", price: 50, image: "https://via.placeholder.com/400" }
+  ];
+
+  const container = document.getElementById("products");
+  let cart = [];
+
+  products.forEach(p => {
+    container.innerHTML += `
+      <div class="card">
+        <img src="${p.image}">
+        <div class="name">${p.name}</div>
+        <div class="price">${p.price} €</div>
+        <button onclick="add(${p.id})">Ajouter</button>
+      </div>
+    `;
+  });
+
+  function add(id) {
+    cart.push(id);
+    tg.HapticFeedback.impactOccurred("soft");
+    tg.MainButton.setText(`Commander (${cart.length})`);
+    tg.MainButton.show();
+  }
+
+  tg.MainButton.onClick(() => {
+    tg.sendData(JSON.stringify(cart));
+    tg.close();
+  });
+</script>
+
+</body>
+</html>
