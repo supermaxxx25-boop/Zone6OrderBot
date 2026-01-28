@@ -185,12 +185,11 @@ async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # CLIENT
     await update.message.reply_text(
-        "✅ *Commande confirmée*\n\n"
-        "👨‍🍳 *Statut : En préparation*\n\n"
-        "📦 Notre équipe prépare ta commande.\n"
-        "🙏 Merci pour ta confiance !",
-        parse_mode="Markdown"
-    )
+    "⏳ *Commande envoyée*\n\n"
+    "Zone6 doit confirmer la commande.\n"
+    "Tu recevras une notification rapidement 🙏",
+    parse_mode="Markdown"
+)
 
     # ADMIN
     texte_admin = (
