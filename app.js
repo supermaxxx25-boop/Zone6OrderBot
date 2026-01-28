@@ -1,19 +1,13 @@
 let panier = {}
 
-// OBLIGATOIRE
+// INITIALISATION OBLIGATOIRE
 Telegram.WebApp.ready()
 
-function add(produit) {
-  panier[produit] = (panier[produit] || 0) + 1
+// CONFIGURATION DU BOUTON TELEGRAM
+Telegram.WebApp.MainButton.setText("✅ Valider la commande")
+Telegram.WebApp.MainButton.show()
 
-  Telegram.WebApp.showPopup({
-    title: "Ajouté au panier",
-    message: produit + " ajouté",
-    buttons: [{ type: "ok" }]
-  })
-}
-
-function envoyer() {
+Telegram.WebApp.MainButton.onClick(() => {
   if (Object.keys(panier).length === 0) {
     Telegram.WebApp.showPopup({
       title: "Panier vide",
@@ -24,6 +18,15 @@ function envoyer() {
   }
 
   console.log("PANIER ENVOYÉ:", panier)
-
   Telegram.WebApp.sendData(JSON.stringify(panier))
+})
+
+function add(produit) {
+  panier[produit] = (panier[produit] || 0) + 1
+
+  Telegram.WebApp.showPopup({
+    title: "Ajouté",
+    message: produit + " ajouté au panier",
+    buttons: [{ type: "ok" }]
+  })
 }
