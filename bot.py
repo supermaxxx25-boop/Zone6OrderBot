@@ -69,34 +69,27 @@ async def finaliser_commande(update, context):
 
     infos = update.message.text
     produit = context.user_data["commande"]
-    user = update.effective_user
 
-    message_admin = (
-        "📦 NOUVELLE COMMANDE\n\n"
-        f"Client : {user.full_name}\n"
-        f"ID : {user.id}\n"
-        f"Plat : {produit}\n"
-        f"Infos : {infos}\n"
-        "Paiement : espèces à la livraison"
+    # Message pour le client
+    await update.message.reply_text(
+        "✅ *Commande confirmée !*\n\n"
+        f"🍽️ Plat : {produit}\n"
+        f"📍 Infos : {infos}\n\n"
+        "💵 Paiement à la livraison\n"
+        "⏱️ Livraison en cours.\nMerci 🙏",
+        parse_mode="Markdown"
     )
 
-    print("DEBUG 1 → fonction finaliser_commande appelée")
-    print("DEBUG 2 → ADMIN_ID =", ADMIN_ID)
-
-    try:
-        await context.bot.send_message(
-            chat_id=ADMIN_ID,
-            text=message_admin
-        )
-        print("DEBUG 3 → message admin ENVOYÉ")
-    except Exception as e:
-        print("❌ ERREUR ENVOI ADMIN :", e)
-
-    await update.message.reply_text(
-        "✅ Commande confirmée !\n"
-        "📦 Transmise au restaurant.\n"
-        "⏱️ Livraison en cours.\n\n"
-        "Merci 🙏"
+    # 🔔 MESSAGE ADMIN
+    await context.bot.send_message(
+        chat_id=ADMIN_ID,
+        text=(
+            "📦 *NOUVELLE COMMANDE*\n\n"
+            f"👤 Client : @{update.effective_user.username}\n"
+            f"🍽️ Plat : {produit}\n"
+            f"📍 Infos : {infos}"
+        ),
+        parse_mode="Markdown"
     )
 
     context.user_data.clear()
