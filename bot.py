@@ -16,7 +16,7 @@ from database import init_db, get_db
 TOKEN = os.getenv("TOKEN")
 
 # ⚠️ REMPLACE par TON ID Telegram (obligatoire)
-ADMIN_ID = 123456789
+ADMIN_ID = 8348647959
 
 
 # --- START ---
