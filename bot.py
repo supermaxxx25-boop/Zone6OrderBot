@@ -136,6 +136,14 @@ async def enregistrer_commande(update, context):
 
 def main():
     init_db()
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+def run_server():
+    server = HTTPServer(("0.0.0.0", 8080), BaseHTTPRequestHandler)
+    server.serve_forever()
+
+threading.Thread(target=run_server, daemon=True).start()
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
