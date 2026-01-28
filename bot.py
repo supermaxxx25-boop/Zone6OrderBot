@@ -185,11 +185,11 @@ async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # CLIENT
     await update.message.reply_text(
-    "⏳ *Commande envoyée*\n\n"
-    "📲 Zone6 doit confirmer la commande.\n"
-    " Tu recevras une notif rapidement 🙏",
-    parse_mode="Markdown"
-)
+        "⏳ *Commande envoyée*\n\n"
+        "📲 Zone6 doit confirmer la commande.\n"
+        "Tu recevras une notif rapidement 🙏",
+        parse_mode="Markdown"
+    )
 
     # ADMIN
     texte_admin = (
@@ -208,13 +208,52 @@ async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
         texte_admin,
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("👨‍🍳 En préparation", callback_data=f"statut_prep_{order_id}")],
-            [InlineKeyboardButton("🛵 En livraison", callback_data=f"statut_livraison_{order_id}")],
-            [InlineKeyboardButton("✅ Livrée", callback_data=f"statut_livree_{order_id}")]
+            [
+                InlineKeyboardButton("✅ Accepter", callback_data=f"accept_{order_id}"),
+                InlineKeyboardButton("❌ Refuser", callback_data=f"refuse_{order_id}")
+            ]
         ])
     )
 
     context.user_data.clear()
+
+# =====================
+# ACCEPT / REFUSE
+# =====================
+async def decision_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    action, order_id = q.data.split("_")
+    cmd = COMMANDES.get(order_id)
+    if not cmd:
+        return
+
+    if action == "accept":
+        await q.edit_message_reply_markup(
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("👨‍🍳 En préparation", callback_data=f"statut_prep_{order_id}")],
+                [InlineKeyboardButton("🛵 En livraison", callback_data=f"statut_livraison_{order_id}")],
+                [InlineKeyboardButton("✅ Livrée", callback_data=f"statut_livree_{order_id}")]
+            ])
+        )
+
+        await context.bot.send_message(
+            cmd["client_id"],
+            "✅ *Ta commande a été acceptée et sera préparée rapidement* 🍽️",
+            parse_mode="Markdown"
+        )
+
+    elif action == "refuse":
+        await q.edit_message_text("❌ *Commande refusée*")
+
+        await context.bot.send_message(
+            cmd["client_id"],
+            "❌ *Désolé, ta commande a été refusée.*\nContacte Zone6 🙏",
+            parse_mode="Markdown"
+        )
+
+        del COMMANDES[order_id]
 
 # =====================
 # STATUT ADMIN
@@ -265,6 +304,7 @@ def main():
     app.add_handler(CallbackQueryHandler(panier_handler, "^panier$"))
     app.add_handler(CallbackQueryHandler(modifier_panier, "^(plus|moins|del)_"))
     app.add_handler(CallbackQueryHandler(valider, "^valider$"))
+    app.add_handler(CallbackQueryHandler(decision_commande, "^(accept|refuse)_"))
     app.add_handler(CallbackQueryHandler(statut_handler, "^statut_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, infos_client))
 
