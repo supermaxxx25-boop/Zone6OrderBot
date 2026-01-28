@@ -15,7 +15,7 @@ from telegram.ext import (
 )
 
 # =========================
-# CONFIG
+# CONFIGURATION
 # =========================
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 8348647959  # ⚠️ remplace par TON vrai ID Telegram
@@ -48,7 +48,7 @@ async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     await query.message.reply_text(
-        "🍽️ *Menu*\n\n"
+        "🍽️ *Menu Zone 6 Food*\n\n"
         "🍔 Burger + frites – 3 500 FCFA\n"
         "🍕 Pizza – 5 000 FCFA\n"
         "🍚 Riz poulet – 4 000 FCFA\n\n"
@@ -66,7 +66,7 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     step = context.user_data.get("step")
 
-    # ----- ÉTAPE 1 : choix du plat -----
+    # ---- ÉTAPE 1 : CHOIX DU PLAT ----
     if step == "choix":
         produits = {
             "Burger": ("Burger + frites", "3 500 FCFA"),
@@ -91,14 +91,16 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
 
-        await update.message.reply_text("❌ Choisis un plat du menu.")
+        await update.message.reply_text("❌ Merci de choisir un plat du menu.")
         return
 
-    # ----- ÉTAPE 2 : infos client -----
+    # ---- ÉTAPE 2 : INFOS CLIENT ----
     if step == "infos":
         produit = context.user_data.get("produit")
         prix = context.user_data.get("prix")
         infos = text
+
+        user = update.effective_user
 
         # Confirmation client
         await update.message.reply_text(
@@ -106,16 +108,18 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🍽️ Plat : {produit}\n"
             f"💰 Prix : {prix}\n"
             f"📍 Infos : {infos}\n\n"
-            "⏱️ Livraison en cours\nMerci 🙏",
+            "⏱️ Livraison en cours.\nMerci 🙏",
             parse_mode="Markdown"
         )
 
-        # Message admin
+        # Notification admin (ID client CORRECT)
         await context.bot.send_message(
             chat_id=ADMIN_ID,
             text=(
                 "📦 *NOUVELLE COMMANDE*\n\n"
-                f"👤 Client : @{update.effective_user.username}\n"
+                f"👤 Nom : {user.first_name or ''} {user.last_name or ''}\n"
+                f"🔗 Username : @{user.username if user.username else 'Aucun'}\n"
+                f"🆔 ID client : `{user.id}`\n\n"
                 f"🍽️ Plat : {produit}\n"
                 f"💰 Prix : {prix}\n"
                 f"📍 Infos : {infos}"
