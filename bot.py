@@ -1,9 +1,14 @@
 import os
-from telegram import ReplyKeyboardMarkup
+from telegram import (
+    ReplyKeyboardMarkup,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup
+)
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     filters
 )
 
@@ -11,28 +16,42 @@ from telegram.ext import (
 # CONFIG
 # =========================
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = 8348647959  # ⚠️ remplace si besoin par TON vrai ID
+ADMIN_ID = 8348647959  # ⚠️ mets TON vrai ID Telegram
 
 # =========================
-# COMMANDES
+# START
 # =========================
 async def start(update, context):
-    await update.message.reply_text("✅ Bot en ligne ! Tape /boutique pour commander.")
+    bouton = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🛒 Ouvrir la boutique", callback_data="open_shop")]
+    ])
 
-    # Test admin (tu peux supprimer plus tard)
+    await update.message.reply_text(
+        "👋 Bienvenue sur *Zone 6 Food* 🍽️\n\n"
+        "Clique sur le bouton ci-dessous pour voir le menu 👇",
+        parse_mode="Markdown",
+        reply_markup=bouton
+    )
+
+    # test admin (optionnel)
     await context.bot.send_message(
         chat_id=ADMIN_ID,
         text="🧪 Bot démarré avec succès"
     )
 
+# =========================
+# BOUTIQUE
+# =========================
+async def open_shop(update, context):
+    query = update.callback_query
+    await query.answer()
 
-async def boutique(update, context):
     clavier = ReplyKeyboardMarkup(
         [["🍔 Burger", "🍕 Pizza"], ["🍚 Riz poulet"]],
         resize_keyboard=True
     )
 
-    await update.message.reply_text(
+    await query.message.reply_text(
         "🍽️ *Menu Zone 6 Food*\n\n"
         "🍔 Burger + frites – 3 500 FCFA\n"
         "🍕 Pizza – 5 000 FCFA\n"
@@ -70,7 +89,9 @@ async def handle_order(update, context):
             )
             return
 
-
+# =========================
+# FINALISATION
+# =========================
 async def finaliser_commande(update, context):
     if "commande" not in context.user_data:
         return
@@ -78,7 +99,7 @@ async def finaliser_commande(update, context):
     infos = update.message.text
     produit = context.user_data["commande"]
 
-    # Message client
+    # Client
     await update.message.reply_text(
         "✅ *Commande confirmée !*\n\n"
         f"🍽️ Plat : {produit}\n"
@@ -88,7 +109,7 @@ async def finaliser_commande(update, context):
         parse_mode="Markdown"
     )
 
-    # Message ADMIN
+    # Admin
     await context.bot.send_message(
         chat_id=ADMIN_ID,
         text=(
@@ -112,15 +133,14 @@ def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("boutique", boutique))
+    app.add_handler(CallbackQueryHandler(open_shop, pattern="open_shop"))
 
-    # ⚠️ ordre IMPORTANT
+    # ordre important
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_order))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, finaliser_commande))
 
     print("✅ Bot en ligne")
     app.run_polling()
-
 
 if __name__ == "__main__":
     main()
