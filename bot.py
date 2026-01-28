@@ -177,6 +177,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         "👋 Bienvenue dans la Zone6 👽"
+        
         "🛒 Tu peux commander ici 👇",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🛍️ Ouvrir la boutique", callback_data="boutique")]
