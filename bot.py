@@ -16,7 +16,7 @@ from telegram.ext import (
 # CONFIG
 # =========================
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = 8348647959  # ⚠️ mets TON vrai ID Telegram
+ADMIN_ID = 8348647959  # mets TON vrai ID
 
 # =========================
 # START
@@ -28,15 +28,9 @@ async def start(update, context):
 
     await update.message.reply_text(
         "👋 Bienvenue sur *Zone 6 Food* 🍽️\n\n"
-        "Clique sur le bouton ci-dessous pour voir le menu 👇",
+        "Clique sur le bouton ci-dessous pour voir la boutique 👇",
         parse_mode="Markdown",
         reply_markup=bouton
-    )
-
-    # test admin (optionnel)
-    await context.bot.send_message(
-        chat_id=ADMIN_ID,
-        text="🧪 Bot démarré avec succès"
     )
 
 # =========================
@@ -62,7 +56,7 @@ async def open_shop(update, context):
     )
 
 # =========================
-# COMMANDE
+# CHOIX DU PLAT
 # =========================
 async def handle_order(update, context):
     text = update.message.text
@@ -77,6 +71,7 @@ async def handle_order(update, context):
         if key in text:
             context.user_data.clear()
             context.user_data["commande"] = produit
+            context.user_data["etat"] = "attente_infos"
 
             await update.message.reply_text(
                 f"🛒 *Commande :* {produit}\n"
@@ -93,7 +88,7 @@ async def handle_order(update, context):
 # FINALISATION
 # =========================
 async def finaliser_commande(update, context):
-    if "commande" not in context.user_data:
+    if context.user_data.get("etat") != "attente_infos":
         return
 
     infos = update.message.text
@@ -135,7 +130,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(open_shop, pattern="open_shop"))
 
-    # ordre important
+    # ⚠️ ordre crucial
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_order))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, finaliser_commande))
 
