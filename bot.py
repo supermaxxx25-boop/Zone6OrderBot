@@ -1,117 +1,183 @@
 import os
-import json
-from telegram import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    WebAppInfo,
-)
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
+    CallbackQueryHandler,
     MessageHandler,
-    filters,
+    ContextTypes,
+    filters
 )
 
-# =========================
-# CONFIGURATION
-# =========================
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = os.getenv("ADMIN_ID")
+# =====================
+# CONFIG
+# =====================
+TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_ID = 8348647959  # ✅ TON ID ADMIN
 
-if not BOT_TOKEN:
-    raise RuntimeError("❌ BOT_TOKEN manquant")
+MENU = {
+    "burger": {"nom": "🍔 Burger + frites", "prix": 7},
+    "pizza": {"nom": "🍕 Pizza", "prix": 10},
+    "riz": {"nom": "🍛 Riz sauce poulet", "prix": 8},
+}
 
-if not ADMIN_ID:
-    raise RuntimeError("❌ ADMIN_ID manquant")
+DEVISE = "€"
 
-ADMIN_ID = int(ADMIN_ID)
-
-# =========================
-# /start
-# =========================
-async def start(update, context):
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "🛒 Ouvrir la boutique",
-                web_app=WebAppInfo(
-                    url="https://supermaxxx25-boop.github.io/Zone6OrderBot/"
-                )
-            )
-        ]
-    ])
-
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=(
-            "🍽️ *Zone 6 Food*\n\n"
-            "Clique sur le bouton ci-dessous pour commander 👇"
-        ),
+# =====================
+# START
+# =====================
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    clavier = [
+        [InlineKeyboardButton("🛒 Ouvrir la boutique", callback_data="boutique")]
+    ]
+    await update.message.reply_text(
+        "👋 Bienvenue chez *Zone 6 Food*",
         parse_mode="Markdown",
-        reply_markup=keyboard
+        reply_markup=InlineKeyboardMarkup(clavier)
     )
 
-# =========================
-# RÉCEPTION DES DONNÉES MINI APP
-# =========================
-async def webapp_data(update, context):
-    chat_id = update.effective_chat.id
-    user = update.effective_user
+# =====================
+# BOUTIQUE
+# =====================
+async def boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
 
-    try:
-        data = update.message.web_app_data.data
-        panier = json.loads(data)
-    except Exception:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="❌ Erreur lors de la réception de la commande."
-        )
+    context.user_data["panier"] = {}
+
+    clavier = [
+        [
+            InlineKeyboardButton("🍔 Burger", callback_data="add_burger"),
+            InlineKeyboardButton("🍕 Pizza", callback_data="add_pizza")
+        ],
+        [
+            InlineKeyboardButton("🍛 Riz poulet", callback_data="add_riz")
+        ],
+        [
+            InlineKeyboardButton("✅ Valider la commande", callback_data="valider")
+        ]
+    ]
+
+    await query.edit_message_text(
+        "🍽️ *Menu Zone 6 Food*\n\n"
+        f"🍔 Burger + frites – 7 {DEVISE}\n"
+        f"🍕 Pizza – 10 {DEVISE}\n"
+        f"🍛 Riz sauce poulet – 8 {DEVISE}\n\n"
+        "👉 Clique pour ajouter au panier",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(clavier)
+    )
+
+# =====================
+# AJOUT PANIER
+# =====================
+async def ajouter(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    produit = query.data.replace("add_", "")
+    panier = context.user_data.get("panier", {})
+
+    panier[produit] = panier.get(produit, 0) + 1
+    context.user_data["panier"] = panier
+
+    await query.edit_message_text(
+        f"✅ Ajouté au panier\n\n🛒 *Panier :*\n{resume_panier(panier)}",
+        parse_mode="Markdown",
+        reply_markup=query.message.reply_markup
+    )
+
+# =====================
+# VALIDER
+# =====================
+async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    panier = context.user_data.get("panier")
+    if not panier:
+        await query.edit_message_text("❌ Panier vide")
         return
 
-    # -------- Confirmation client --------
-    message_client = "✅ *Commande confirmée !*\n\n"
+    total = calcul_total(panier)
 
-    for plat, qte in panier.items():
-        message_client += f"• {plat} × {qte}\n"
-
-    message_client += "\n💵 Paiement à la livraison\n⏱️ Livraison en cours"
-
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=message_client,
+    await query.edit_message_text(
+        f"🧾 *Récapitulatif*\n\n"
+        f"{resume_panier(panier)}\n"
+        f"💰 Total : {total} {DEVISE}\n\n"
+        "📍 Envoie maintenant :\n"
+        "• Adresse\n"
+        "• Téléphone",
         parse_mode="Markdown"
     )
 
-    # -------- Notification admin --------
-    message_admin = (
-        "🧾 *Nouvelle commande Mini App*\n\n"
-        f"👤 Client : {user.first_name or 'Inconnu'}\n"
-        f"🆔 ID client : `{user.id}`\n\n"
+    context.user_data["attente_infos"] = True
+
+# =====================
+# INFOS CLIENT
+# =====================
+async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.user_data.get("attente_infos"):
+        return
+
+    panier = context.user_data["panier"]
+    infos = update.message.text
+    user = update.message.from_user
+    total = calcul_total(panier)
+
+    # Confirmation client
+    await update.message.reply_text(
+        "✅ *Commande confirmée !*\n\n"
+        f"{resume_panier(panier)}\n"
+        f"💰 Total : {total} {DEVISE}\n\n"
+        "⏱️ Livraison en cours. Merci 🙏",
+        parse_mode="Markdown"
     )
 
-    for plat, qte in panier.items():
-        message_admin += f"• {plat} × {qte}\n"
-
+    # Notification admin
     await context.bot.send_message(
         chat_id=ADMIN_ID,
-        text=message_admin,
+        text=
+        "🆕 *NOUVELLE COMMANDE*\n\n"
+        f"👤 Client : {user.full_name}\n"
+        f"🆔 ID : `{user.id}`\n\n"
+        f"{resume_panier(panier)}\n"
+        f"💰 Total : {total} {DEVISE}\n\n"
+        f"📍 Infos client :\n{infos}",
         parse_mode="Markdown"
     )
 
-# =========================
+    context.user_data.clear()
+
+# =====================
+# UTILS
+# =====================
+def resume_panier(panier):
+    texte = ""
+    for cle, qte in panier.items():
+        produit = MENU[cle]
+        texte += f"{produit['nom']} x{qte} = {produit['prix']*qte} {DEVISE}\n"
+    return texte
+
+def calcul_total(panier):
+    return sum(MENU[k]["prix"] * v for k, v in panier.items())
+
+# =====================
 # MAIN
-# =========================
+# =====================
 def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    if not TOKEN:
+        raise RuntimeError("BOT_TOKEN manquant")
+
+    app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(boutique, pattern="^boutique$"))
+    app.add_handler(CallbackQueryHandler(ajouter, pattern="^add_"))
+    app.add_handler(CallbackQueryHandler(valider, pattern="^valider$"))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, infos_client))
 
-    # Handler CRITIQUE pour Mini App
-    app.add_handler(
-        MessageHandler(filters.StatusUpdate.WEB_APP_DATA, webapp_data)
-    )
-
-    print("🤖 Bot lancé avec succès")
+    print("🤖 Bot Zone 6 Food en ligne")
     app.run_polling()
 
 if __name__ == "__main__":
