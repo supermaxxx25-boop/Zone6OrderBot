@@ -105,8 +105,7 @@ async def finaliser_commande(update, context):
 # -------- MAIN --------
 
 def main():
-    if not TOKEN:
-        raise RuntimeError("BOT_TOKEN manquant")
+    print("DEBUG BOT_TOKEN =", TOKEN)
 
     app = ApplicationBuilder().token(TOKEN).build()
 
