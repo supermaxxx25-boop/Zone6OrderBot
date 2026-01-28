@@ -4,44 +4,11 @@
   <meta charset="UTF-8">
   <title>Zone 6 Food</title>
 
-  <!-- Script officiel Telegram Mini App -->
+  <!-- Telegram Mini App -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      padding: 15px;
-    }
-
-    h1 {
-      text-align: center;
-    }
-
-    .card {
-      background: white;
-      padding: 15px;
-      margin-bottom: 12px;
-      border-radius: 8px;
-    }
-
-    button {
-      width: 100%;
-      padding: 10px;
-      font-size: 16px;
-      margin-top: 8px;
-      border: none;
-      border-radius: 5px;
-      background: #0088cc;
-      color: white;
-    }
-
-    .valider {
-      background: green;
-      font-size: 18px;
-      margin-top: 20px;
-    }
-  </style>
+  <!-- CSS -->
+  <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
@@ -68,24 +35,8 @@
 
 <button class="valider" onclick="envoyer()">✅ Valider la commande</button>
 
-<script>
-  let panier = {}
-
-  function add(produit) {
-    panier[produit] = (panier[produit] || 0) + 1
-    alert(produit + " ajouté au panier")
-  }
-
-  function envoyer() {
-    if (Object.keys(panier).length === 0) {
-      alert("Panier vide")
-      return
-    }
-
-    Telegram.WebApp.sendData(JSON.stringify(panier))
-    Telegram.WebApp.close()
-  }
-</script>
+<!-- JS -->
+<script src="app.js"></script>
 
 </body>
 </html>
