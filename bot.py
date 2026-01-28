@@ -1,5 +1,6 @@
 import os
 import uuid
+import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -9,6 +10,11 @@ from telegram.ext import (
     ContextTypes,
     filters
 )
+
+# =====================
+# LOGS
+# =====================
+logging.basicConfig(level=logging.INFO)
 
 # =====================
 # CONFIG
@@ -126,6 +132,27 @@ async def afficher_panier(q, context):
     )
 
 # =====================
+# MODIFIER PANIER (CORRIGÉ)
+# =====================
+async def modifier_panier(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    action, cle = q.data.split("_")
+    panier = context.user_data.get("panier", {})
+
+    if action == "plus":
+        panier[cle] += 1
+    elif action == "moins":
+        panier[cle] -= 1
+        if panier[cle] <= 0:
+            panier.pop(cle, None)
+    elif action == "del":
+        panier.pop(cle, None)
+
+    await afficher_panier(q, context)
+
+# =====================
 # VALIDER
 # =====================
 async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -172,8 +199,7 @@ async def traiter_infos_client(update: Update, context: ContextTypes.DEFAULT_TYP
     }
 
     await update.message.reply_text(
-        "⏳ *Commande envoyée*\n"
-        "📲 En attente de validation par Zone6",
+        "⏳ *Commande envoyée*\n📲 En attente de validation par Zone6",
         parse_mode="Markdown"
     )
 
@@ -216,8 +242,7 @@ async def admin_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         cmd["client_id"],
-        "✅ *Votre commande a été acceptée !*\n"
-        "👨‍🍳 Elle est en préparation.",
+        "✅ *Votre commande a été acceptée !*\n👨‍🍳 Elle est en préparation.",
         parse_mode="Markdown"
     )
 
@@ -239,8 +264,7 @@ async def admin_refuse(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         cmd["client_id"],
-        "❌ *Votre commande a été refusée.*\n"
-        "🙏 Désolé pour le désagrément.",
+        "❌ *Votre commande a été refusée.*\n🙏 Désolé pour le désagrément.",
         parse_mode="Markdown"
     )
 
