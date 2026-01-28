@@ -20,7 +20,7 @@ DEVISE = "€"
 COMMANDES = {}
 
 # =====================
-# CATEGORIES & MENU
+# CATEGORIES & PRODUITS
 # =====================
 CATEGORIES = {
     "burgers": {
@@ -162,7 +162,11 @@ async def afficher_panier(q, context):
 
     for cle, qte in panier.items():
         p = MENU[cle]
-        texte += f"{p['nom']}\n➜ Quantité : {qte}\n➜ Sous-total : {p['prix']*qte} €\n\n"
+        texte += (
+            f"{p['nom']}\n"
+            f"➜ Quantité : {qte}\n"
+            f"➜ Sous-total : {p['prix'] * qte} €\n\n"
+        )
 
         clavier.append([
             InlineKeyboardButton("➖", callback_data=f"moins_{cle}"),
@@ -183,11 +187,12 @@ async def afficher_panier(q, context):
     )
 
 # =====================
-# VALIDER
+# VALIDER COMMANDE
 # =====================
 async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
+
     context.user_data["attente_infos"] = True
 
     await q.edit_message_text(
@@ -196,16 +201,19 @@ async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================
-# INFOS CLIENT
+# INFOS CLIENT (IMPORTANT)
 # =====================
 async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.user_data.get("attente_infos"):
         return
 
+    panier = context.user_data.get("panier", {})
+    if not panier:
+        return
+
     user = update.message.from_user
-    panier = context.user_data["panier"]
-    total = calcul_total(panier)
     infos = update.message.text
+    total = calcul_total(panier)
     order_id = str(uuid.uuid4())[:8]
 
     COMMANDES[order_id] = {
@@ -213,11 +221,11 @@ async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "client_nom": user.full_name,
         "panier": panier.copy(),
         "total": total,
-        "statut": "en_attente"
+        "infos": infos
     }
 
     await update.message.reply_text(
-        "⏳ *Commande envoyée*\nZone6 doit confirmer 🙏",
+        "⏳ *Commande envoyée*\nZone6 va la confirmer rapidement 🙏",
         parse_mode="Markdown"
     )
 
@@ -236,18 +244,21 @@ def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+
     app.add_handler(CallbackQueryHandler(boutique, "^boutique$"))
     app.add_handler(CallbackQueryHandler(afficher_categorie, "^cat_"))
     app.add_handler(CallbackQueryHandler(ajouter, "^add_"))
     app.add_handler(CallbackQueryHandler(panier_handler, "^panier$"))
     app.add_handler(CallbackQueryHandler(valider, "^valider$"))
 
-    # 🔑 CORRECTION CLÉ
+    # 🔑 CORRECTION CRITIQUE (ne pas enlever)
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, infos_client),
         block=False
     )
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler)
+    )
 
     print("🤖 Zone 6 Food — Bot actif")
     app.run_polling()
