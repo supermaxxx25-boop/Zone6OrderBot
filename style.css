@@ -1,0 +1,33 @@
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f4f4;
+  padding: 15px;
+}
+
+h1 {
+  text-align: center;
+}
+
+.card {
+  background: white;
+  padding: 15px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+}
+
+button {
+  width: 100%;
+  padding: 10px;
+  font-size: 16px;
+  margin-top: 8px;
+  border: none;
+  border-radius: 5px;
+  background: #0088cc;
+  color: white;
+}
+
+.valider {
+  background: green;
+  font-size: 18px;
+  margin-top: 20px;
+}
