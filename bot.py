@@ -30,8 +30,7 @@ COMMANDES = {}
 # =====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 Bienvenue chez *Zone 6 Food*\n\n"
-        "Commande facilement 👇",
+        "👋 Bienvenue chez *Zone 6 Food*\n\nCommande facilement 👇",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🛒 Ouvrir la boutique", callback_data="boutique")]
@@ -71,7 +70,7 @@ async def ajouter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await q.answer()
 
     produit = q.data.replace("add_", "")
-    panier = context.user_data["panier"]
+    panier = context.user_data.setdefault("panier", {})
     panier[produit] = panier.get(produit, 0) + 1
 
     await afficher_panier(q, context)
@@ -102,11 +101,10 @@ async def afficher_panier(q, context):
 
     for cle, qte in panier.items():
         p = MENU[cle]
-        sous_total = p["prix"] * qte
         texte += (
             f"{p['nom']}\n"
             f"➜ Quantité : {qte}\n"
-            f"➜ Sous-total : {sous_total} €\n\n"
+            f"➜ Sous-total : {p['prix'] * qte} €\n\n"
         )
 
         clavier.append([
@@ -135,16 +133,16 @@ async def modifier_panier(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await q.answer()
 
     action, cle = q.data.split("_")
-    panier = context.user_data["panier"]
+    panier = context.user_data.get("panier", {})
 
     if action == "plus":
         panier[cle] += 1
     elif action == "moins":
         panier[cle] -= 1
         if panier[cle] <= 0:
-            del panier[cle]
+            panier.pop(cle)
     elif action == "del":
-        del panier[cle]
+        panier.pop(cle, None)
 
     await afficher_panier(q, context)
 
@@ -155,32 +153,45 @@ async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
 
+    context.user_data["attente_infos"] = True
+
     await q.edit_message_text(
         "📍 *Merci de préciser :*\n"
         "• Adresse de livraison\n"
         "• Téléphone",
         parse_mode="Markdown"
     )
-    context.user_data["attente_infos"] = True
 
 # =====================
-# INFOS CLIENT + COMMANDE
+# MESSAGE TEXTE (LOGIQUE CENTRALE)
 # =====================
-async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.user_data.get("attente_infos"):
+async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Cas 1 : on attend les infos client
+    if context.user_data.get("attente_infos"):
+        await traiter_infos_client(update, context)
         return
 
+    # Cas 2 : n'importe quel autre message → boutique
+    await update.message.reply_text(
+        "🛒 Tu peux commander ici 👇",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🛍️ Ouvrir la boutique", callback_data="boutique")]
+        ])
+    )
+
+# =====================
+# TRAITEMENT INFOS CLIENT
+# =====================
+async def traiter_infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
-    panier = context.user_data["panier"]
+    panier = context.user_data.get("panier", {})
     total = calcul_total(panier)
     infos = update.message.text
     order_id = str(uuid.uuid4())[:8]
 
     COMMANDES[order_id] = {
         "client_id": user.id,
-        "client_nom": user.full_name,
-        "panier": panier.copy(),
-        "total": total
+        "panier": panier.copy()
     }
 
     await update.message.reply_text(
@@ -190,20 +201,13 @@ async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-    texte_admin = (
-        f"🆕 *NOUVELLE COMMANDE*\n"
-        f"🆔 `{order_id}`\n\n"
-        f"👤 Client : {user.full_name}\n"
-        f"🆔 Telegram : `{user.id}`\n\n"
-        f"🧾 *DÉTAIL COMMANDE*\n"
-        f"{resume_panier(panier)}\n"
-        f"💰 *Total : {total} €*\n\n"
-        f"📍 Infos client :\n{infos}"
-    )
-
     await context.bot.send_message(
         ADMIN_ID,
-        texte_admin,
+        f"🆕 *NOUVELLE COMMANDE*\n"
+        f"🆔 `{order_id}`\n\n"
+        f"{resume_panier(panier)}\n"
+        f"💰 *Total : {total} €*\n\n"
+        f"📍 Infos client :\n{infos}",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("👨‍🍳 En préparation", callback_data=f"statut_prep_{order_id}")],
@@ -239,31 +243,16 @@ async def statut_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================
-# FALLBACK BOUTIQUE
-# =====================
-async def fallback_boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.user_data.get("attente_infos"):
-        return
-
-    await update.message.reply_text(
-        "🛒 Tu peux commander ici 👇",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🛍️ Ouvrir la boutique", callback_data="boutique")]
-        ])
-    )
-
-# =====================
 # UTILS
 # =====================
 def calcul_total(panier):
     return sum(MENU[k]["prix"] * v for k, v in panier.items())
 
 def resume_panier(panier):
-    texte = ""
-    for k, v in panier.items():
-        p = MENU[k]
-        texte += f"• {p['nom']} x{v} = {p['prix']*v} €\n"
-    return texte
+    return "\n".join(
+        f"• {MENU[k]['nom']} x{v} = {MENU[k]['prix']*v} €"
+        for k, v in panier.items()
+    )
 
 # =====================
 # MAIN
@@ -278,12 +267,9 @@ def main():
     app.add_handler(CallbackQueryHandler(modifier_panier, "^(plus|moins|del)_"))
     app.add_handler(CallbackQueryHandler(valider, "^valider$"))
     app.add_handler(CallbackQueryHandler(statut_handler, "^statut_"))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
-    # ordre IMPORTANT
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, infos_client))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fallback_boutique))
-
-    print("🤖 Zone 6 Food — prêt à prendre des commandes")
+    print("🤖 Zone 6 Food — bot opérationnel")
     app.run_polling()
 
 if __name__ == "__main__":
