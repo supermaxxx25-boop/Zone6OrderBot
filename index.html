@@ -4,11 +4,13 @@
   <meta charset="UTF-8">
   <title>Zone 6 Food</title>
 
-  <!-- Telegram Mini App -->
+  <!-- Telegram Mini App SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
   <!-- CSS -->
   <link rel="stylesheet" href="style.css">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 
 <body>
@@ -18,7 +20,7 @@
 <div class="card">
   <h3>🍔 Burger + frites</h3>
   <p>3 500 FCFA</p>
-  <button onclick="add('Burger')">➕ Ajouter</button>
+  <button onclick="add('Burger + frites')">➕ Ajouter</button>
 </div>
 
 <div class="card">
@@ -28,14 +30,13 @@
 </div>
 
 <div class="card">
-  <h3>🍚 Riz poulet</h3>
+  <h3>🍚 Riz sauce poulet</h3>
   <p>4 000 FCFA</p>
-  <button onclick="add('Riz')">➕ Ajouter</button>
+  <button onclick="add('Riz sauce poulet')">➕ Ajouter</button>
 </div>
 
-<button class="valider" onclick="envoyer()">
-  ✅ Valider la commande
-</button>
+<!-- IMPORTANT : PAS de bouton Valider ici -->
+<!-- Le bouton est celui de Telegram (MainButton) -->
 
 <!-- JS -->
 <script src="app.js"></script>
