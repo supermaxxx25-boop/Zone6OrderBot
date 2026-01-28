@@ -2,14 +2,17 @@ import os
 from telegram import (
     ReplyKeyboardMarkup,
     InlineKeyboardButton,
-    InlineKeyboardMarkup
+    InlineKeyboardMarkup,
+    Update,
 )
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
-    filters
+    ConversationHandler,
+    ContextTypes,
+    filters,
 )
 
 # =========================
@@ -18,17 +21,20 @@ from telegram.ext import (
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 8348647959  # mets TON vrai ID
 
+# États de conversation
+CHOIX_PRODUIT, INFOS_CLIENT = range(2)
+
 # =========================
 # START
 # =========================
-async def start(update, context):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bouton = InlineKeyboardMarkup([
         [InlineKeyboardButton("🛒 Ouvrir la boutique", callback_data="open_shop")]
     ])
 
     await update.message.reply_text(
         "👋 Bienvenue sur *Zone 6 Food* 🍽️\n\n"
-        "Clique sur le bouton ci-dessous pour voir la boutique 👇",
+        "Clique sur le bouton ci-dessous pour commander 👇",
         parse_mode="Markdown",
         reply_markup=bouton
     )
@@ -36,7 +42,7 @@ async def start(update, context):
 # =========================
 # BOUTIQUE
 # =========================
-async def open_shop(update, context):
+async def open_shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
@@ -55,10 +61,12 @@ async def open_shop(update, context):
         reply_markup=clavier
     )
 
+    return CHOIX_PRODUIT
+
 # =========================
-# CHOIX DU PLAT
+# CHOIX DU PRODUIT
 # =========================
-async def handle_order(update, context):
+async def choix_produit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
     produits = {
@@ -69,9 +77,7 @@ async def handle_order(update, context):
 
     for key, (produit, prix) in produits.items():
         if key in text:
-            context.user_data.clear()
             context.user_data["commande"] = produit
-            context.user_data["etat"] = "attente_infos"
 
             await update.message.reply_text(
                 f"🛒 *Commande :* {produit}\n"
@@ -82,17 +88,17 @@ async def handle_order(update, context):
                 "💵 Paiement à la livraison",
                 parse_mode="Markdown"
             )
-            return
+            return INFOS_CLIENT
+
+    await update.message.reply_text("❌ Merci de choisir un plat du menu.")
+    return CHOIX_PRODUIT
 
 # =========================
 # FINALISATION
 # =========================
-async def finaliser_commande(update, context):
-    if context.user_data.get("etat") != "attente_infos":
-        return
-
+async def finaliser_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     infos = update.message.text
-    produit = context.user_data["commande"]
+    produit = context.user_data.get("commande")
 
     # Client
     await update.message.reply_text(
@@ -117,6 +123,7 @@ async def finaliser_commande(update, context):
     )
 
     context.user_data.clear()
+    return ConversationHandler.END
 
 # =========================
 # MAIN
@@ -127,12 +134,17 @@ def main():
 
     app = ApplicationBuilder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(open_shop, pattern="open_shop"))
+    conv_handler = ConversationHandler(
+        entry_points=[CallbackQueryHandler(open_shop, pattern="open_shop")],
+        states={
+            CHOIX_PRODUIT: [MessageHandler(filters.TEXT & ~filters.COMMAND, choix_produit)],
+            INFOS_CLIENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, finaliser_commande)],
+        },
+        fallbacks=[CommandHandler("start", start)],
+    )
 
-    # ⚠️ ordre crucial
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_order))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, finaliser_commande))
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(conv_handler)
 
     print("✅ Bot en ligne")
     app.run_polling()
