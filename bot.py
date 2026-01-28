@@ -2,7 +2,7 @@ import os
 import uuid
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    Application,
+    ApplicationBuilder,
     CommandHandler,
     CallbackQueryHandler,
     MessageHandler,
@@ -16,9 +16,6 @@ from telegram.ext import (
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 8348647959
 DEVISE = "€"
-
-if not TOKEN:
-    raise RuntimeError("❌ BOT_TOKEN manquant (Railway > Variables)")
 
 COMMANDES = {}
 
@@ -66,7 +63,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================
-# MESSAGE TEXTE UNIQUE
+# MESSAGE TEXTE
 # =====================
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("attente_infos"):
@@ -90,6 +87,28 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "⏳ *Commande envoyée*\nZone6 va la confirmer rapidement 🙏",
             parse_mode="Markdown"
+        )
+
+        # 📤 ENVOI À L'ADMIN
+        resume = "🆕 *Nouvelle commande*\n\n"
+        for cle, qte in panier.items():
+            p = MENU[cle]
+            resume += f"{p['nom']} x{qte}\n"
+
+        resume += f"\n💰 Total : {total} €"
+        resume += f"\n📍 Infos client : {infos}"
+        resume += f"\n🆔 Commande : `{order_id}`"
+
+        await context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text=resume,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("✅ Accepter", callback_data=f"accept_{order_id}"),
+                    InlineKeyboardButton("❌ Refuser", callback_data=f"reject_{order_id}")
+                ]
+            ])
         )
 
         context.user_data.clear()
@@ -122,7 +141,7 @@ async def boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================
-# PRODUITS PAR CATEGORIE
+# PRODUITS
 # =====================
 async def afficher_categorie(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -138,18 +157,17 @@ async def afficher_categorie(update: Update, context: ContextTypes.DEFAULT_TYPE)
         for key, prod in categorie["produits"].items()
     ]
     clavier.append([
-        InlineKeyboardButton("⬅️ Retour catégories", callback_data="boutique"),
+        InlineKeyboardButton("⬅️ Retour", callback_data="boutique"),
         InlineKeyboardButton("🛒 Panier", callback_data="panier")
     ])
 
     await q.edit_message_text(
         f"{categorie['nom']}\n\nSélectionne un produit 👇",
-        parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(clavier)
     )
 
 # =====================
-# AJOUT PANIER
+# PANIER
 # =====================
 async def ajouter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -162,9 +180,6 @@ async def ajouter(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await afficher_panier(q, context)
 
-# =====================
-# PANIER
-# =====================
 async def panier_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
@@ -184,32 +199,20 @@ async def afficher_panier(q, context):
         return
 
     texte = "🛒 *Ton panier*\n\n"
-    clavier = []
-
     for cle, qte in panier.items():
         p = MENU[cle]
-        texte += (
-            f"{p['nom']}\n"
-            f"➜ Quantité : {qte}\n"
-            f"➜ Sous-total : {p['prix'] * qte} €\n\n"
-        )
-
-        clavier.append([
-            InlineKeyboardButton("➖", callback_data=f"moins_{cle}"),
-            InlineKeyboardButton("➕", callback_data=f"plus_{cle}"),
-            InlineKeyboardButton("🗑️ Retirer", callback_data=f"del_{cle}")
-        ])
+        texte += f"{p['nom']} x{qte} — {p['prix'] * qte} €\n"
 
     total = calcul_total(panier)
-    texte += f"💰 *Total : {total} €*"
-
-    clavier.append([InlineKeyboardButton("✅ Confirmer la commande", callback_data="valider")])
-    clavier.append([InlineKeyboardButton("⬅️ Continuer mes achats", callback_data="boutique")])
+    texte += f"\n💰 *Total : {total} €*"
 
     await q.edit_message_text(
         texte,
         parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(clavier)
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ Confirmer la commande", callback_data="valider")],
+            [InlineKeyboardButton("⬅️ Continuer", callback_data="boutique")]
+        ])
     )
 
 # =====================
@@ -218,13 +221,53 @@ async def afficher_panier(q, context):
 async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-
     context.user_data["attente_infos"] = True
 
     await q.edit_message_text(
-        "📍 *Merci de préciser :*\n• Adresse de livraison\n• Téléphone",
+        "📍 *Merci d’envoyer :*\nAdresse + Téléphone",
         parse_mode="Markdown"
     )
+
+# =====================
+# ADMIN
+# =====================
+async def accepter_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    order_id = q.data.replace("accept_", "")
+    cmd = COMMANDES.pop(order_id, None)
+
+    if not cmd:
+        await q.edit_message_text("❌ Commande introuvable")
+        return
+
+    await context.bot.send_message(
+        chat_id=cmd["client_id"],
+        text="✅ *Commande acceptée !*\nElle est en préparation 🍽️",
+        parse_mode="Markdown"
+    )
+
+    await q.edit_message_text(f"✅ Commande `{order_id}` acceptée", parse_mode="Markdown")
+
+async def refuser_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    order_id = q.data.replace("reject_", "")
+    cmd = COMMANDES.pop(order_id, None)
+
+    if not cmd:
+        await q.edit_message_text("❌ Commande introuvable")
+        return
+
+    await context.bot.send_message(
+        chat_id=cmd["client_id"],
+        text="❌ *Commande refusée*\nMerci de contacter Zone6 🙏",
+        parse_mode="Markdown"
+    )
+
+    await q.edit_message_text(f"❌ Commande `{order_id}` refusée", parse_mode="Markdown")
 
 # =====================
 # UTILS
@@ -236,18 +279,21 @@ def calcul_total(panier):
 # MAIN
 # =====================
 def main():
-    app = Application.builder().token(TOKEN).build()
+    app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(boutique, pattern="^boutique$"))
-    app.add_handler(CallbackQueryHandler(afficher_categorie, pattern="^cat_"))
-    app.add_handler(CallbackQueryHandler(ajouter, pattern="^add_"))
-    app.add_handler(CallbackQueryHandler(panier_handler, pattern="^panier$"))
-    app.add_handler(CallbackQueryHandler(valider, pattern="^valider$"))
+    app.add_handler(CallbackQueryHandler(boutique, "^boutique$"))
+    app.add_handler(CallbackQueryHandler(afficher_categorie, "^cat_"))
+    app.add_handler(CallbackQueryHandler(ajouter, "^add_"))
+    app.add_handler(CallbackQueryHandler(panier_handler, "^panier$"))
+    app.add_handler(CallbackQueryHandler(valider, "^valider$"))
+
+    app.add_handler(CallbackQueryHandler(accepter_commande, "^accept_"))
+    app.add_handler(CallbackQueryHandler(refuser_commande, "^reject_"))
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
-    print("🤖 Zone 6 Food — Bot actif")
+    print("🤖 Zone6 Food — Bot actif")
     app.run_polling()
 
 if __name__ == "__main__":
