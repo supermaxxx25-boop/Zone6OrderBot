@@ -98,17 +98,22 @@ async def finaliser_commande(update, context):
 # -------- MAIN --------
 
 def main():
-    print("DEBUG BOT_TOKEN =", TOKEN)
+    if not TOKEN:
+        raise RuntimeError("BOT_TOKEN manquant")
 
     app = ApplicationBuilder().token(TOKEN).build()
 
+    # Commandes
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("boutique", boutique))
+
+    # Messages texte (ordre IMPORTANT)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_order))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, finaliser_commande))
 
-    app.run_polling()
+    print("✅ Bot en ligne")
 
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
