@@ -45,7 +45,7 @@ CATEGORIES = {
     }
 }
 
-# MENU global (compatibilité panier / admin)
+# MENU global (utilisé par panier / admin)
 MENU = {
     key: prod
     for cat in CATEGORIES.values()
@@ -67,6 +67,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # MESSAGE PAR DEFAUT
 # =====================
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Ne répond que si on n'attend PAS les infos client
+    if context.user_data.get("attente_infos"):
+        return
+
     await update.message.reply_text(
         "👋 Salut et bienvenue dans la Zone6,\n🛒 Tu peux commander ici 👇",
         reply_markup=InlineKeyboardMarkup([
@@ -85,7 +89,6 @@ async def boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton(cat["nom"], callback_data=f"cat_{key}")]
         for key, cat in CATEGORIES.items()
     ]
-
     clavier.append([InlineKeyboardButton("🛒 Voir mon panier", callback_data="panier")])
 
     await q.edit_message_text(
@@ -110,7 +113,6 @@ async def afficher_categorie(update: Update, context: ContextTypes.DEFAULT_TYPE)
         [InlineKeyboardButton(prod["nom"], callback_data=f"add_{key}")]
         for key, prod in categorie["produits"].items()
     ]
-
     clavier.append([
         InlineKeyboardButton("⬅️ Retour catégories", callback_data="boutique"),
         InlineKeyboardButton("🛒 Panier", callback_data="panier")
@@ -162,7 +164,7 @@ async def afficher_panier(q, context):
 
     for cle, qte in panier.items():
         p = MENU[cle]
-        texte += f"{p['nom']}\n➜ Quantité : {qte}\n➜ Sous-total : {p['prix']*qte} €\n\n"
+        texte += f"{p['nom']}\n➜ Quantité : {qte}\n➜ Sous-total : {p['prix'] * qte} €\n\n"
 
         clavier.append([
             InlineKeyboardButton("➖", callback_data=f"moins_{cle}"),
@@ -292,9 +294,7 @@ async def admin_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("👨‍🍳 Préparation", callback_data=f"statut_prep_{order_id}"),
                 InlineKeyboardButton("🛵 Livraison", callback_data=f"statut_livraison_{order_id}")
             ],
-            [
-                InlineKeyboardButton("✅ Livrée", callback_data=f"statut_livree_{order_id}")
-            ]
+            [InlineKeyboardButton("✅ Livrée", callback_data=f"statut_livree_{order_id}")]
         ])
     )
 
@@ -352,7 +352,7 @@ def resume_panier(panier):
     texte = "🧾 *Commande*\n"
     for k, v in panier.items():
         p = MENU[k]
-        texte += f"• {p['nom']} x{v} = {p['prix']*v} €\n"
+        texte += f"• {p['nom']} x{v} = {p['prix'] * v} €\n"
     return texte + "\n"
 
 # =====================
@@ -371,8 +371,10 @@ def main():
     app.add_handler(CallbackQueryHandler(statut_handler, "^statut_"))
     app.add_handler(CallbackQueryHandler(admin_accept, "^admin_accept_"))
     app.add_handler(CallbackQueryHandler(admin_refuse, "^admin_refuse_"))
+
+    # ORDRE IMPORTANT
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, infos_client))
-    app.add_handler(MessageHandler(filters.ALL, message_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
     print("🤖 Zone 6 Food — Bot actif")
     app.run_polling()
