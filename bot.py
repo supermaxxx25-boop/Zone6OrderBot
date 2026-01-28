@@ -186,9 +186,8 @@ async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # CLIENT
     await update.message.reply_text(
     "⏳ *Commande envoyée*\n\n"
-    "📲 La Zone6 doit confirmer la commande.\n"
-    "📳 N'oublie pas d'activer les notif'\n"
-    " Tu recevras une validation rapidement 🙏",
+    "📲 Zone6 doit confirmer la commande.\n"
+    " Tu recevras une notif rapidement 🙏",
     parse_mode="Markdown"
 )
 
