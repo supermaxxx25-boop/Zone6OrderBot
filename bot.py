@@ -36,7 +36,7 @@ COMMANDES = {}
 # =====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 Bienvenue chez *Zone 6 Food*\n\nCommande facilement 👇",
+        "👋 Bienvenue dans la *Zone6*\n\nCommande facilement 👇",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🛒 Ouvrir la boutique", callback_data="boutique")]
