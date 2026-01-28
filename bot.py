@@ -8,6 +8,7 @@ from telegram.ext import (
 )
 
 TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_ID = 8348647959  # remplace par TON vrai ID Telegram
 
 
 # -------- COMMANDES --------
