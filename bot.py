@@ -28,7 +28,8 @@ MENU = {
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     clavier = [[InlineKeyboardButton("🛒 Ouvrir la boutique", callback_data="boutique")]]
     await update.message.reply_text(
-        "👋 Bienvenue chez *Zone 6 Food*",
+        "👋 Bienvenue chez *Zone 6 Food*\n\n"
+        "Commande facilement en quelques clics 👇",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(clavier)
     )
@@ -52,7 +53,7 @@ async def boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("🍛 Riz poulet", callback_data="add_riz")
         ],
         [
-            InlineKeyboardButton("🛒 Voir / modifier le panier", callback_data="panier")
+            InlineKeyboardButton("🛒 Voir / modifier mon panier", callback_data="panier")
         ]
     ]
 
@@ -61,7 +62,7 @@ async def boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🍔 Burger + frites – 7 €\n"
         "🍕 Pizza – 10 €\n"
         "🍛 Riz sauce poulet – 8 €\n\n"
-        "👉 Clique pour ajouter au panier",
+        "👉 Clique sur un plat pour l’ajouter au panier",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(clavier)
     )
@@ -89,33 +90,54 @@ async def panier_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await afficher_panier(query, context)
 
 # =====================
-# AFFICHAGE PANIER
+# AFFICHAGE PANIER (UX)
 # =====================
 async def afficher_panier(query, context):
     panier = context.user_data.get("panier", {})
 
     if not panier:
-        await query.edit_message_text("🛒 Panier vide")
+        await query.edit_message_text(
+            "🛒 *Ton panier est vide*\n\n"
+            "Ajoute des plats depuis le menu 👇",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("⬅️ Retour au menu", callback_data="boutique")]
+            ])
+        )
         return
 
-    texte = "🛒 *Ton panier*\n\n"
+    texte = (
+        "🛒 *Ton panier*\n"
+        "_Utilise ➕ ➖ pour modifier les quantités_\n"
+        "_🗑️ pour retirer un plat_\n\n"
+    )
+
     clavier = []
 
     for cle, qte in panier.items():
         produit = MENU[cle]
-        texte += f"{produit['nom']} x{qte} = {produit['prix']*qte} {DEVISE}\n"
+        sous_total = produit["prix"] * qte
+
+        texte += (
+            f"{produit['nom']}\n"
+            f"➜ Quantité : {qte}\n"
+            f"➜ Sous-total : {sous_total} {DEVISE}\n\n"
+        )
+
         clavier.append([
             InlineKeyboardButton("➖", callback_data=f"moins_{cle}"),
             InlineKeyboardButton("➕", callback_data=f"plus_{cle}"),
-            InlineKeyboardButton("❌", callback_data=f"del_{cle}")
+            InlineKeyboardButton("🗑️ Retirer", callback_data=f"del_{cle}")
         ])
 
     total = calcul_total(panier)
-    texte += f"\n💰 *Total : {total} {DEVISE}*"
+    texte += f"💰 *Total à payer : {total} {DEVISE}*"
 
     clavier.append([
-        InlineKeyboardButton("✅ Valider la commande", callback_data="valider"),
-        InlineKeyboardButton("⬅️ Retour menu", callback_data="boutique")
+        InlineKeyboardButton("✅ Confirmer ma commande", callback_data="valider")
+    ])
+    clavier.append([
+        InlineKeyboardButton("⬅️ Continuer mes achats", callback_data="boutique")
     ])
 
     await query.edit_message_text(
@@ -150,26 +172,22 @@ async def modifier_panier(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await afficher_panier(query, context)
 
 # =====================
-# VALIDER COMMANDE
+# VALIDATION
 # =====================
 async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     panier = context.user_data.get("panier", {})
-    if not panier:
-        await query.edit_message_text("❌ Panier vide")
-        return
-
     total = calcul_total(panier)
 
     await query.edit_message_text(
-        f"🧾 *Récapitulatif*\n\n"
+        f"🧾 *Récapitulatif de ta commande*\n\n"
         f"{resume_panier(panier)}\n"
-        f"💰 Total : {total} {DEVISE}\n\n"
+        f"💰 *Total : {total} {DEVISE}*\n\n"
         "📍 Envoie maintenant :\n"
-        "• Adresse\n"
-        "• Téléphone",
+        "• Adresse de livraison\n"
+        "• Numéro de téléphone",
         parse_mode="Markdown"
     )
 
@@ -187,22 +205,26 @@ async def infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     total = calcul_total(panier)
 
+    # Message client (UX ++)
     await update.message.reply_text(
         "✅ *Commande confirmée !*\n\n"
-        f"{resume_panier(panier)}\n"
-        f"💰 Total : {total} {DEVISE}\n\n"
-        "⏱️ Livraison en cours. Merci 🙏",
+        "📦 Notre équipe prépare ta commande.\n"
+        "📞 Tu peux être contacté si besoin.\n\n"
+        f"{resume_panier(panier)}"
+        f"\n💰 *Total : {total} {DEVISE}*\n\n"
+        "🙏 Merci pour ta confiance !",
         parse_mode="Markdown"
     )
 
+    # Message admin
     await context.bot.send_message(
         chat_id=ADMIN_ID,
         text=
         "🆕 *NOUVELLE COMMANDE*\n\n"
         f"👤 Client : {user.full_name}\n"
         f"🆔 ID : `{user.id}`\n\n"
-        f"{resume_panier(panier)}\n"
-        f"💰 Total : {total} {DEVISE}\n\n"
+        f"{resume_panier(panier)}"
+        f"\n💰 Total : {total} {DEVISE}\n\n"
         f"📍 Infos client :\n{infos}",
         parse_mode="Markdown"
     )
@@ -216,7 +238,7 @@ def resume_panier(panier):
     texte = ""
     for cle, qte in panier.items():
         produit = MENU[cle]
-        texte += f"{produit['nom']} x{qte} = {produit['prix']*qte} {DEVISE}\n"
+        texte += f"• {produit['nom']} x{qte} = {produit['prix']*qte} {DEVISE}\n"
     return texte
 
 def calcul_total(panier):
@@ -236,7 +258,7 @@ def main():
     app.add_handler(CallbackQueryHandler(valider, pattern="^valider$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, infos_client))
 
-    print("🤖 Bot Zone 6 Food en ligne")
+    print("🤖 Bot Zone 6 Food prêt (UX améliorée)")
     app.run_polling()
 
 if __name__ == "__main__":
