@@ -79,7 +79,9 @@ async def finaliser_commande(update, context):
         f"📍 Infos : {infos}\n"
         "💵 Paiement : espèces à la livraison"
     )
-    print("ENVOI COMMANDE ADMIN")
+
+    # 👇 ICI EXACTEMENT
+    print("DEBUG → tentative d'envoi à l'admin", ADMIN_ID)
 
     await context.bot.send_message(
         chat_id=ADMIN_ID,
