@@ -1,5 +1,8 @@
 import os
+import threading
 from datetime import datetime
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -15,6 +18,12 @@ from database import init_db, get_db
 
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = 123456789  # ⬅️ remplace par TON ID Telegram
+
+
+# 🔌 Mini serveur HTTP pour Railway
+def run_server():
+    server = HTTPServer(("0.0.0.0", 8080), BaseHTTPRequestHandler)
+    server.serve_forever()
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -136,14 +145,10 @@ async def enregistrer_commande(update, context):
 
 def main():
     init_db()
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
 
-def run_server():
-    server = HTTPServer(("0.0.0.0", 8080), BaseHTTPRequestHandler)
-    server.serve_forever()
+    # 🟢 Lancer le mini serveur HTTP
+    threading.Thread(target=run_server, daemon=True).start()
 
-threading.Thread(target=run_server, daemon=True).start()
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
