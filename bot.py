@@ -1,164 +1,63 @@
 import os
 import threading
-from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    CallbackQueryHandler,
-    MessageHandler,
-    ContextTypes,
-    filters,
-)
+from telegram.ext import ApplicationBuilder
 
-from produits import PRODUITS
-from database import init_db, get_db
-
-TOKEN = os.getenv("TOKEN")
-ADMIN_ID = 123456789  # ⬅️ remplace par TON ID Telegram
+from database import init_db
+from handlers.start import register_start
+from handlers.boutique import register_boutique
+from handlers.panier import register_panier
+from handlers.commande import register_commande
 
 
-# 🔌 Mini serveur HTTP pour Railway
+# =========================
+# CONFIGURATION
+# =========================
+TOKEN = os.getenv("8430752899:AAE-UEOqtwvSbU20BlP9-ApGwln8WY9R1x4")
+ADMIN_ID = 8348647959  # ton ID admin
+
+
+# =========================
+# SERVEUR HTTP (Railway Worker)
+# =========================
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK")
+
+    def log_message(self, format, *args):
+        return
+
+
 def run_server():
-    server = HTTPServer(("0.0.0.0", 8080), BaseHTTPRequestHandler)
+    server = HTTPServer(("0.0.0.0", 8080), HealthHandler)
     server.serve_forever()
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("🛒 Boutique", callback_data="boutique")],
-        [InlineKeyboardButton("🧺 Mon panier", callback_data="panier")],
-    ]
-    await update.message.reply_text(
-        "👋 Bienvenue sur la boutique ZONE 6\nPaiement à la livraison 🇫🇷",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
-
-
-async def boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    for pid, p in PRODUITS.items():
-        await query.message.reply_photo(
-            photo=p["image"],
-            caption=f"🛍️ {p['nom']}\n💶 {p['prix']} €",
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("➕ Ajouter au panier", callback_data=f"add_{pid}")]]
-            ),
-        )
-
-
-async def add_panier(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    panier = context.user_data.get("panier", [])
-    panier.append(int(query.data.split("_")[1]))
-    context.user_data["panier"] = panier
-
-    await query.message.reply_text("✅ Produit ajouté au panier")
-
-
-async def panier(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    panier = context.user_data.get("panier", [])
-    if not panier:
-        await query.message.reply_text("🧺 Panier vide")
-        return
-
-    total = sum(PRODUITS[p]["prix"] for p in panier)
-    recap = "\n".join(f"- {PRODUITS[p]['nom']}" for p in panier)
-
-    await query.message.reply_text(
-        f"🧾 Panier :\n{recap}\n\n💶 Total : {total} €",
-        reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("✅ Commander", callback_data="commander")]]
-        ),
-    )
-
-
-async def commander(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    context.user_data["step"] = "nom"
-    await query.message.reply_text("✍️ Ton nom complet ?")
-
-
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    step = context.user_data.get("step")
-
-    if step == "nom":
-        context.user_data["nom"] = update.message.text
-        context.user_data["step"] = "tel"
-        await update.message.reply_text("📞 Ton téléphone ?")
-
-    elif step == "tel":
-        context.user_data["tel"] = update.message.text
-        context.user_data["step"] = "adresse"
-        await update.message.reply_text("📍 Ton adresse ?")
-
-    elif step == "adresse":
-        context.user_data["adresse"] = update.message.text
-        await enregistrer_commande(update, context)
-
-
-async def enregistrer_commande(update, context):
-    panier = context.user_data.get("panier", [])
-    total = sum(PRODUITS[p]["prix"] for p in panier)
-    recap = ", ".join(PRODUITS[p]["nom"] for p in panier)
-    numero = f"CMD-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-
-    conn = get_db()
-    c = conn.cursor()
-    c.execute(
-        "INSERT INTO commandes (numero, client, telephone, adresse, recap, total, statut, chat_id) VALUES (?,?,?,?,?,?,?,?)",
-        (
-            numero,
-            context.user_data["nom"],
-            context.user_data["tel"],
-            context.user_data["adresse"],
-            recap,
-            total,
-            "En attente",
-            update.message.chat_id,
-        ),
-    )
-    conn.commit()
-    conn.close()
-
-    await update.message.reply_text(
-        f"✅ Commande confirmée\n📦 {numero}\n💶 {total} €\n🚚 Paiement à la livraison"
-    )
-
-    await context.bot.send_message(
-        ADMIN_ID,
-        f"🆕 {numero}\n👤 {context.user_data['nom']}\n📞 {context.user_data['tel']}\n📍 {context.user_data['adresse']}\n🛍️ {recap}\n💶 {total} €",
-    )
-
-    context.user_data.clear()
-
-
+# =========================
+# MAIN
+# =========================
 def main():
+    if not TOKEN:
+        raise RuntimeError("❌ TOKEN manquant (variable d'environnement)")
+
+    print("🔧 Initialisation de la base de données...")
     init_db()
 
-    # 🟢 Lancer le mini serveur HTTP
+    print("🌐 Démarrage du serveur HTTP Railway...")
     threading.Thread(target=run_server, daemon=True).start()
 
+    print("🤖 Lancement du bot Telegram...")
     app = ApplicationBuilder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(boutique, pattern="^boutique$"))
-    app.add_handler(CallbackQueryHandler(panier, pattern="^panier$"))
-    app.add_handler(CallbackQueryHandler(add_panier, pattern="^add_"))
-    app.add_handler(CallbackQueryHandler(commander, pattern="^commander$"))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    register_start(app)
+    register_boutique(app)
+    register_panier(app)
+    register_commande(app)
 
-    print("Bot started")
+    print("✅ Bot en ligne et opérationnel")
     app.run_polling()
 
 
