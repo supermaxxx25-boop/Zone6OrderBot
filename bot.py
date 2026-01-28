@@ -14,14 +14,13 @@ from telegram.ext import (
 # =====================
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 8348647959
+DEVISE = "€"
 
 MENU = {
     "burger": {"nom": "🍔 Burger + frites", "prix": 7},
     "pizza": {"nom": "🍕 Pizza", "prix": 10},
     "riz": {"nom": "🍛 Riz sauce poulet", "prix": 8},
 }
-
-DEVISE = "€"
 
 # =====================
 # START
@@ -41,15 +40,13 @@ async def boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    context.user_data["panier"] = {}
+    if "panier" not in context.user_data:
+        context.user_data["panier"] = {}
 
-    await afficher_boutique(query, context)
-
-async def afficher_boutique(query, context):
     clavier = [
         [
             InlineKeyboardButton("🍔 Burger", callback_data="add_burger"),
-            InlineKeyboardButton("🍕 Pizza", callback_data="add_pizza"),
+            InlineKeyboardButton("🍕 Pizza", callback_data="add_pizza")
         ],
         [
             InlineKeyboardButton("🍛 Riz poulet", callback_data="add_riz")
@@ -70,7 +67,7 @@ async def afficher_boutique(query, context):
     )
 
 # =====================
-# AJOUT PANIER
+# AJOUT AU PANIER
 # =====================
 async def ajouter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -84,10 +81,7 @@ async def ajouter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await afficher_panier(query, context)
 
 # =====================
-# PANIER
-# =====================
-# =====================
-# PANIER (HANDLER)
+# PANIER HANDLER
 # =====================
 async def panier_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -110,7 +104,6 @@ async def afficher_panier(query, context):
     for cle, qte in panier.items():
         produit = MENU[cle]
         texte += f"{produit['nom']} x{qte} = {produit['prix']*qte} {DEVISE}\n"
-
         clavier.append([
             InlineKeyboardButton("➖", callback_data=f"moins_{cle}"),
             InlineKeyboardButton("➕", callback_data=f"plus_{cle}"),
@@ -131,14 +124,8 @@ async def afficher_panier(query, context):
         reply_markup=InlineKeyboardMarkup(clavier)
     )
 
-    await query.edit_message_text(
-        texte,
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(clavier)
-    )
-
 # =====================
-# MODIFIER QUANTITÉS
+# MODIFIER PANIER
 # =====================
 async def modifier_panier(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -163,7 +150,7 @@ async def modifier_panier(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await afficher_panier(query, context)
 
 # =====================
-# VALIDER
+# VALIDER COMMANDE
 # =====================
 async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -244,12 +231,12 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(boutique, pattern="^boutique$"))
     app.add_handler(CallbackQueryHandler(ajouter, pattern="^add_"))
-    app.add_handler(CallbackQueryHandler(afficher_panier, pattern="^panier$"))
+    app.add_handler(CallbackQueryHandler(panier_handler, pattern="^panier$"))
     app.add_handler(CallbackQueryHandler(modifier_panier, pattern="^(plus|moins|del)_"))
     app.add_handler(CallbackQueryHandler(valider, pattern="^valider$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, infos_client))
 
-    print("🤖 Bot Zone 6 Food prêt")
+    print("🤖 Bot Zone 6 Food en ligne")
     app.run_polling()
 
 if __name__ == "__main__":
