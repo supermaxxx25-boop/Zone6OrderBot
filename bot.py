@@ -126,33 +126,11 @@ async def afficher_panier(q, context):
     )
 
 # =====================
-# MODIFIER PANIER
-# =====================
-async def modifier_panier(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-
-    action, cle = q.data.split("_")
-    panier = context.user_data.get("panier", {})
-
-    if action == "plus":
-        panier[cle] += 1
-    elif action == "moins":
-        panier[cle] -= 1
-        if panier[cle] <= 0:
-            panier.pop(cle)
-    elif action == "del":
-        panier.pop(cle, None)
-
-    await afficher_panier(q, context)
-
-# =====================
 # VALIDER
 # =====================
 async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-
     context.user_data["attente_infos"] = True
 
     await q.edit_message_text(
@@ -163,15 +141,13 @@ async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================
-# MESSAGE TEXTE (LOGIQUE CENTRALE)
+# MESSAGE TEXTE
 # =====================
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Cas 1 : on attend les infos client
     if context.user_data.get("attente_infos"):
         await traiter_infos_client(update, context)
         return
 
-    # Cas 2 : n'importe quel autre message → boutique
     await update.message.reply_text(
         "🛒 Tu peux commander ici 👇",
         reply_markup=InlineKeyboardMarkup([
@@ -180,7 +156,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================
-# TRAITEMENT INFOS CLIENT
+# TRAITEMENT COMMANDE
 # =====================
 async def traiter_infos_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
@@ -191,13 +167,13 @@ async def traiter_infos_client(update: Update, context: ContextTypes.DEFAULT_TYP
 
     COMMANDES[order_id] = {
         "client_id": user.id,
-        "panier": panier.copy()
+        "panier": panier.copy(),
+        "statut": "en_attente"
     }
 
     await update.message.reply_text(
-        "⏳ *Commande envoyée*\n\n"
-        "📲 Zone6 doit confirmer la commande.\n"
-        "Tu recevras une notif rapidement 🙏",
+        "⏳ *Commande envoyée*\n"
+        "📲 En attente de validation par Zone6",
         parse_mode="Markdown"
     )
 
@@ -210,13 +186,65 @@ async def traiter_infos_client(update: Update, context: ContextTypes.DEFAULT_TYP
         f"📍 Infos client :\n{infos}",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("👨‍🍳 En préparation", callback_data=f"statut_prep_{order_id}")],
-            [InlineKeyboardButton("🛵 En livraison", callback_data=f"statut_livraison_{order_id}")],
+            [
+                InlineKeyboardButton("✅ Accepter", callback_data=f"admin_accept_{order_id}"),
+                InlineKeyboardButton("❌ Refuser", callback_data=f"admin_refuse_{order_id}")
+            ],
+            [
+                InlineKeyboardButton("👨‍🍳 En préparation", callback_data=f"statut_prep_{order_id}"),
+                InlineKeyboardButton("🛵 En livraison", callback_data=f"statut_livraison_{order_id}")
+            ],
             [InlineKeyboardButton("✅ Livrée", callback_data=f"statut_livree_{order_id}")]
         ])
     )
 
     context.user_data.clear()
+
+# =====================
+# ADMIN : ACCEPTER
+# =====================
+async def admin_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    order_id = q.data.replace("admin_accept_", "")
+    cmd = COMMANDES.get(order_id)
+    if not cmd:
+        return
+
+    cmd["statut"] = "confirmee"
+
+    await context.bot.send_message(
+        cmd["client_id"],
+        "✅ *Votre commande a été acceptée !*\n"
+        "👨‍🍳 Elle est en préparation.",
+        parse_mode="Markdown"
+    )
+
+    await q.edit_message_reply_markup(reply_markup=None)
+
+# =====================
+# ADMIN : REFUSER
+# =====================
+async def admin_refuse(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    order_id = q.data.replace("admin_refuse_", "")
+    cmd = COMMANDES.get(order_id)
+    if not cmd:
+        return
+
+    cmd["statut"] = "refusee"
+
+    await context.bot.send_message(
+        cmd["client_id"],
+        "❌ *Votre commande a été refusée.*\n"
+        "🙏 Désolé pour le désagrément.",
+        parse_mode="Markdown"
+    )
+
+    await q.edit_message_reply_markup(reply_markup=None)
 
 # =====================
 # STATUT ADMIN
@@ -227,7 +255,7 @@ async def statut_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     _, statut, order_id = q.data.split("_")
     cmd = COMMANDES.get(order_id)
-    if not cmd:
+    if not cmd or cmd["statut"] != "confirmee":
         return
 
     messages = {
@@ -266,6 +294,8 @@ def main():
     app.add_handler(CallbackQueryHandler(panier_handler, "^panier$"))
     app.add_handler(CallbackQueryHandler(modifier_panier, "^(plus|moins|del)_"))
     app.add_handler(CallbackQueryHandler(valider, "^valider$"))
+    app.add_handler(CallbackQueryHandler(admin_accept, "^admin_accept_"))
+    app.add_handler(CallbackQueryHandler(admin_refuse, "^admin_refuse_"))
     app.add_handler(CallbackQueryHandler(statut_handler, "^statut_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
