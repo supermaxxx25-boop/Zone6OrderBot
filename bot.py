@@ -71,10 +71,21 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "panier": panier.copy()
         }
 
-        await update.message.reply_text(
-            "⏳ *Commande envoyée*\nEn attente de validation",
-            parse_mode="Markdown"
-        )
+        recap = "🧾 *Récap de ta commande*\n\n"
+for k, qte in panier.items():
+    recap += f"{MENU[k]['nom']} x{qte}\n"
+
+recap += f"\n💰 Total : {total} {DEVISE}"
+recap += f"\n🆔 Commande : `{order_id}`"
+recap += "\n\n⏳ En attente de validation"
+
+await update.message.reply_text(
+    recap,
+    parse_mode="Markdown",
+    reply_markup=InlineKeyboardMarkup([
+        [InlineKeyboardButton("❌ Annuler la commande", callback_data=f"cancel_{order_id}")]
+    ])
+)
 
         texte = "🆕 *NOUVELLE COMMANDE*\n\n"
         for k, qte in panier.items():
