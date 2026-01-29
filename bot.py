@@ -182,11 +182,16 @@ async def afficher_panier(q, context):
         ])
     )
 
+# ✅ SEULE MODIFICATION ICI
 async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     context.user_data["attente_infos"] = True
-    await q.edit_message_text("📍 Envoie adresse + téléphone")
+    await q.edit_message_text(
+        "Merci de nous fournir :\n\n"
+        "- Ton adresse 📍\n\n"
+        "- Ton numéro 📲"
+    )
 
 # =====================
 # ANNULATION CLIENT
