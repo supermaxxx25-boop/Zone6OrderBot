@@ -213,7 +213,7 @@ async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================
-# ANNULATION CLIENT (MODIF ICI UNIQUEMENT)
+# ANNULATION CLIENT (FIX FINAL)
 # =====================
 async def annuler_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -225,12 +225,18 @@ async def annuler_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.edit_message_text("⚠️ Cette commande ne peut plus être annulée.")
         return
 
-    # 🔴 Mise à jour du message admin EXISTANT
+    panier = commande["panier"]
+
+    texte_admin = "🆕 *NOUVELLE COMMANDE*\n\n❌ *COMMANDE ANNULÉE PAR LE CLIENT*\n\n"
+    for k, qte in panier.items():
+        texte_admin += f"{MENU[k]['nom']} x{qte}\n"
+    texte_admin += f"\n🆔 `{oid}`"
+
     try:
         await context.bot.edit_message_text(
             chat_id=ADMIN_ID,
             message_id=commande["admin_message_id"],
-            text=q.message.text + "\n\n❌ *COMMANDE ANNULÉE PAR LE CLIENT*",
+            text=texte_admin,
             parse_mode="Markdown",
             reply_markup=None
         )
