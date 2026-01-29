@@ -156,20 +156,19 @@ async def afficher_categorie(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def ajouter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-
     context.user_data.setdefault("panier", {})
     key = q.data.replace("add_", "")
     context.user_data["panier"][key] = context.user_data["panier"].get(key, 0) + 1
     await afficher_panier(q, context)
 
+# =====================
+# PANIER AVEC + / - / 🗑️
+# =====================
 async def panier_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     await afficher_panier(q, context)
 
-# =====================
-# PANIER (AJOUT ➕ ➖ 🗑️ ICI UNIQUEMENT)
-# =====================
 async def afficher_panier(q, context):
     panier = context.user_data.get("panier", {})
     if not panier:
@@ -199,7 +198,7 @@ async def afficher_panier(q, context):
     )
 
 # =====================
-# ACTIONS PANIER
+# BOUTONS + / - / 🗑️
 # =====================
 async def plus_produit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -225,12 +224,25 @@ async def supprimer_produit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await afficher_panier(q, context)
 
 # =====================
-# UTILS / STATUTS / MAIN
-# (INCHANGÉS)
+# VALIDATION
+# =====================
+async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    context.user_data["attente_infos"] = True
+    await q.edit_message_text(
+        "Merci de nous fournir :\n\n- Ton adresse 📍\n\n- Ton numéro 📲"
+    )
+
+# =====================
+# UTILS
 # =====================
 def calcul_total(panier):
     return sum(MENU[k]["prix"] * q for k, q in panier.items())
 
+# =====================
+# MAIN
+# =====================
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
