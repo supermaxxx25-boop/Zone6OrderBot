@@ -246,17 +246,32 @@ def calcul_total(panier):
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
+    # START
     app.add_handler(CommandHandler("start", start))
+
+    # BOUTIQUE
     app.add_handler(CallbackQueryHandler(boutique, "^boutique$"))
     app.add_handler(CallbackQueryHandler(afficher_categorie, "^cat_"))
     app.add_handler(CallbackQueryHandler(ajouter, "^add_"))
     app.add_handler(CallbackQueryHandler(panier_handler, "^panier$"))
     app.add_handler(CallbackQueryHandler(valider, "^valider$"))
 
+    # PANIER + / - / 🗑️
     app.add_handler(CallbackQueryHandler(plus_produit, "^plus_"))
     app.add_handler(CallbackQueryHandler(minus_produit, "^minus_"))
     app.add_handler(CallbackQueryHandler(supprimer_produit, "^del_"))
 
+    # ❗ ANNULATION CLIENT (MANQUANT)
+    app.add_handler(CallbackQueryHandler(annuler_commande, "^cancel_"))
+
+    # ❗ STATUTS ADMIN (MANQUANTS)
+    app.add_handler(CallbackQueryHandler(accepter_commande, "^accept_"))
+    app.add_handler(CallbackQueryHandler(refuser_commande, "^reject_"))
+    app.add_handler(CallbackQueryHandler(preparation_commande, "^prep_"))
+    app.add_handler(CallbackQueryHandler(livraison_commande, "^livraison_"))
+    app.add_handler(CallbackQueryHandler(livree_commande, "^livree_"))
+
+    # MESSAGE TEXTE
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
     print("🤖 Zone6 Food — Bot actif")
