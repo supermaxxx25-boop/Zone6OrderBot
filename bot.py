@@ -200,12 +200,28 @@ def calcul_total(panier):
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
+    # START
     app.add_handler(CommandHandler("start", start))
+
+    # BOUTIQUE
+    app.add_handler(CallbackQueryHandler(boutique, "^boutique$"))
+    app.add_handler(CallbackQueryHandler(afficher_categorie, "^cat_"))
+    app.add_handler(CallbackQueryHandler(ajouter, "^add_"))
+    app.add_handler(CallbackQueryHandler(panier_handler, "^panier$"))
+    app.add_handler(CallbackQueryHandler(valider, "^valider$"))
+
+    # ANNULATION CLIENT
     app.add_handler(CallbackQueryHandler(annuler_commande, "^cancel_"))
+
+    # STATUTS ADMIN
+    app.add_handler(CallbackQueryHandler(accepter_commande, "^accept_"))
+    app.add_handler(CallbackQueryHandler(refuser_commande, "^reject_"))
+    app.add_handler(CallbackQueryHandler(preparation_commande, "^prep_"))
+    app.add_handler(CallbackQueryHandler(livraison_commande, "^livraison_"))
+    app.add_handler(CallbackQueryHandler(livree_commande, "^livree_"))
+
+    # MESSAGE TEXTE
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
     print("🤖 Zone6 Food — Bot actif")
     app.run_polling()
-
-if __name__ == "__main__":
-    main()
