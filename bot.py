@@ -53,7 +53,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================
-# MESSAGE TEXTE
+# MESSAGE TEXTE (FINALISATION COMMANDE)
 # =====================
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("attente_infos"):
@@ -111,7 +111,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "client_id": user.id,
             "panier": panier.copy(),
             "message_id": msg.message_id,
-            "admin_message_id": admin_msg.message_id
+            "admin_message_id": admin_msg.message_id,
+            "admin_text": texte_admin
         }
 
         context.user_data.clear()
@@ -213,7 +214,7 @@ async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================
-# ANNULATION CLIENT (FIX FINAL)
+# ANNULATION CLIENT
 # =====================
 async def annuler_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -222,48 +223,55 @@ async def annuler_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     commande = COMMANDES.get(oid)
     if not commande:
-        await q.edit_message_text("⚠️ Cette commande ne peut plus être annulée.")
         return
 
-    panier = commande["panier"]
-
-    texte_admin = "🆕 *NOUVELLE COMMANDE*\n\n❌ *COMMANDE ANNULÉE PAR LE CLIENT*\n\n"
-    for k, qte in panier.items():
-        texte_admin += f"{MENU[k]['nom']} x{qte}\n"
-    texte_admin += f"\n🆔 `{oid}`"
-
-    try:
-        await context.bot.edit_message_text(
-            chat_id=ADMIN_ID,
-            message_id=commande["admin_message_id"],
-            text=texte_admin,
-            parse_mode="Markdown",
-            reply_markup=None
-        )
-    except:
-        pass
-
-    await q.edit_message_text(
-        "❌ *Commande annulée avec succès*",
+    await context.bot.edit_message_text(
+        chat_id=ADMIN_ID,
+        message_id=commande["admin_message_id"],
+        text=commande["admin_text"] + "\n\n❌ *COMMANDE ANNULÉE PAR LE CLIENT*",
         parse_mode="Markdown"
     )
 
+    await q.edit_message_text("❌ *Commande annulée*", parse_mode="Markdown")
+
 # =====================
-# ADMIN
+# ADMIN ACTIONS (MISE À JOUR MESSAGE)
 # =====================
 async def accepter_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     oid = q.data.replace("accept_", "")
+
+    commande = COMMANDES.get(oid)
+    if not commande:
+        return
+
     await update_recap_client(context, oid, "🟢 *COMMANDE ACCEPTÉE*")
-    await q.edit_message_reply_markup(reply_markup=None)
+
+    await context.bot.edit_message_text(
+        chat_id=ADMIN_ID,
+        message_id=commande["admin_message_id"],
+        text=commande["admin_text"] + "\n\n🟢 *COMMANDE ACCEPTÉE*",
+        parse_mode="Markdown"
+    )
 
 async def refuser_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     oid = q.data.replace("reject_", "")
+
+    commande = COMMANDES.get(oid)
+    if not commande:
+        return
+
     await update_recap_client(context, oid, "🔴 *COMMANDE REFUSÉE*")
-    await q.edit_message_reply_markup(reply_markup=None)
+
+    await context.bot.edit_message_text(
+        chat_id=ADMIN_ID,
+        message_id=commande["admin_message_id"],
+        text=commande["admin_text"] + "\n\n🔴 *COMMANDE REFUSÉE*",
+        parse_mode="Markdown"
+    )
 
 # =====================
 # UTILS
@@ -273,13 +281,11 @@ async def update_recap_client(context, oid, statut):
     if not commande:
         return
 
-    panier = commande["panier"]
-
     texte = "🧾 *Récap de ta commande*\n\n"
-    for k, qte in panier.items():
+    for k, qte in commande["panier"].items():
         texte += f"{MENU[k]['nom']} x{qte}\n"
 
-    texte += f"\n💰 Total : {calcul_total(panier)} {DEVISE}"
+    texte += f"\n💰 Total : {calcul_total(commande['panier'])} {DEVISE}"
     texte += f"\n🆔 Commande : `{oid}`"
     texte += f"\n\n{statut}"
 
