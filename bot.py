@@ -71,16 +71,15 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "panier": panier.copy()
         }
 
-        # ---- RÉCAP CLIENT ----
         recap = "🧾 *Récap de ta commande*\n\n"
         for k, qte in panier.items():
             recap += f"{MENU[k]['nom']} x{qte}\n"
 
         recap += f"\n💰 Total : {total} {DEVISE}"
         recap += f"\n🆔 Commande : `{order_id}`"
-        recap += "\n\n⏳ En attente de validation"
+        recap += "\n\n⏳ *STATUT : EN ATTENTE DE VALIDATION*"
 
-        await update.message.reply_text(
+        msg = await update.message.reply_text(
             recap,
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([
@@ -88,7 +87,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ])
         )
 
-        # ---- MESSAGE ADMIN ----
+        COMMANDES[order_id]["message_id"] = msg.message_id
+
         texte = "🆕 *NOUVELLE COMMANDE*\n\n"
         for k, qte in panier.items():
             texte += f"{MENU[k]['nom']} x{qte}\n"
@@ -219,6 +219,37 @@ async def annuler_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================
+# UTILS
+# =====================
+async def maj_recap_client(context, oid, statut):
+    commande = COMMANDES.get(oid)
+    if not commande:
+        return
+
+    panier = commande["panier"]
+
+    texte = "🧾 *Récap de ta commande*\n\n"
+    for k, qte in panier.items():
+        texte += f"{MENU[k]['nom']} x{qte}\n"
+
+    texte += f"\n💰 Total : {calcul_total(panier)} {DEVISE}"
+    texte += f"\n🆔 Commande : `{oid}`"
+    texte += f"\n\n{statut}"
+
+    try:
+        await context.bot.edit_message_text(
+            chat_id=commande["client_id"],
+            message_id=commande["message_id"],
+            text=texte,
+            parse_mode="Markdown"
+        )
+    except:
+        pass
+
+def calcul_total(panier):
+    return sum(MENU[k]["prix"] * q for k, q in panier.items())
+
+# =====================
 # STATUTS ADMIN
 # =====================
 async def accepter_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -227,14 +258,9 @@ async def accepter_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     oid = q.data.replace("accept_", "")
     if oid not in COMMANDES:
-        await q.answer("Commande déjà traitée", show_alert=True)
         return
 
-    await context.bot.send_message(
-        COMMANDES[oid]["client_id"],
-        "🟢 *Commande acceptée*",
-        parse_mode="Markdown"
-    )
+    await maj_recap_client(context, oid, "🟢 *STATUT : COMMANDE ACCEPTÉE*")
 
     await q.edit_message_text(
         q.message.text + "\n\n🟢 *STATUT : ACCEPTÉE*",
@@ -249,11 +275,7 @@ async def preparation_commande(update: Update, context: ContextTypes.DEFAULT_TYP
     await q.answer()
 
     oid = q.data.replace("prep_", "")
-    await context.bot.send_message(
-        COMMANDES[oid]["client_id"],
-        "⏳ *Commande en préparation*",
-        parse_mode="Markdown"
-    )
+    await maj_recap_client(context, oid, "⏳ *STATUT : EN PRÉPARATION*")
 
     await q.edit_message_text(
         q.message.text + "\n\n⏳ *STATUT : EN PRÉPARATION*",
@@ -268,11 +290,7 @@ async def livraison_commande(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await q.answer()
 
     oid = q.data.replace("livraison_", "")
-    await context.bot.send_message(
-        COMMANDES[oid]["client_id"],
-        "🏎️ *Votre commande arrive !*",
-        parse_mode="Markdown"
-    )
+    await maj_recap_client(context, oid, "🏎️ *STATUT : EN LIVRAISON*")
 
     await q.edit_message_text(
         q.message.text + "\n\n🏎️ *STATUT : EN LIVRAISON*",
@@ -287,11 +305,7 @@ async def livree_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await q.answer()
 
     oid = q.data.replace("livree_", "")
-    await context.bot.send_message(
-        COMMANDES[oid]["client_id"],
-        "✅ *Commande livrée ! Merci ❤️*",
-        parse_mode="Markdown"
-    )
+    await maj_recap_client(context, oid, "✅ *STATUT : COMMANDE LIVRÉE — MERCI ❤️*")
 
     COMMANDES.pop(oid, None)
 
@@ -305,11 +319,7 @@ async def refuser_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await q.answer()
 
     oid = q.data.replace("reject_", "")
-    await context.bot.send_message(
-        COMMANDES[oid]["client_id"],
-        "❌ *Commande refusée*",
-        parse_mode="Markdown"
-    )
+    await maj_recap_client(context, oid, "❌ *STATUT : COMMANDE REFUSÉE*")
 
     COMMANDES.pop(oid, None)
 
@@ -317,12 +327,6 @@ async def refuser_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
         q.message.text + "\n\n🔴 *STATUT : REFUSÉE*",
         parse_mode="Markdown"
     )
-
-# =====================
-# UTILS
-# =====================
-def calcul_total(panier):
-    return sum(MENU[k]["prix"] * q for k, q in panier.items())
 
 # =====================
 # MAIN
