@@ -10,12 +10,18 @@ from telegram.ext import (
     filters
 )
 
+# =====================
+# CONFIG
+# =====================
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 8348647959
 DEVISE = "€"
 
 COMMANDES = {}
 
+# =====================
+# MENU
+# =====================
 CATEGORIES = {
     "burgers": {
         "nom": "🍔 Burgers",
@@ -35,7 +41,6 @@ CATEGORIES = {
 
 MENU = {k: v for c in CATEGORIES.values() for k, v in c["produits"].items()}
 
-
 # =====================
 # START
 # =====================
@@ -46,7 +51,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🛍️ Ouvrir la boutique", callback_data="boutique")]
         ])
     )
-
 
 # =====================
 # MESSAGE TEXTE
@@ -70,7 +74,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         recap += f"\n🆔 Commande : `{order_id}`"
         recap += "\n\n⏳ *STATUT : EN ATTENTE DE VALIDATION*"
 
-        msg = await update.message.reply_text(
+        msg_client = await update.message.reply_text(
             recap,
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([
@@ -92,7 +96,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         texte_admin += f"\n🆔 `{order_id}`"
         texte_admin += "\n\n⏳ *STATUT : EN ATTENTE*"
 
-        admin_msg = await context.bot.send_message(
+        msg_admin = await context.bot.send_message(
             ADMIN_ID,
             texte_admin,
             parse_mode="Markdown",
@@ -107,16 +111,15 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         COMMANDES[order_id] = {
             "client_id": user.id,
             "panier": panier.copy(),
-            "message_id": msg.message_id,
-            "admin_message_id": admin_msg.message_id,
-            "statut": "EN ATTENTE"
+            "message_id": msg_client.message_id,
+            "admin_message_id": msg_admin.message_id,
+            "admin_texte": texte_admin
         }
 
         context.user_data.clear()
         return
 
     await start(update, context)
-
 
 # =====================
 # BOUTIQUE / PANIER
@@ -134,7 +137,6 @@ async def boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
     )
 
-
 async def afficher_categorie(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
@@ -146,7 +148,6 @@ async def afficher_categorie(update: Update, context: ContextTypes.DEFAULT_TYPE)
     boutons.append([InlineKeyboardButton("⬅️ Retour", callback_data="boutique")])
     await q.edit_message_text(CATEGORIES[cat]["nom"], reply_markup=InlineKeyboardMarkup(boutons))
 
-
 async def ajouter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
@@ -155,30 +156,28 @@ async def ajouter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["panier"][key] = context.user_data["panier"].get(key, 0) + 1
     await afficher_panier(q, context)
 
-
 async def modifier_qte(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     action, key = q.data.split("_", 1)
+
     panier = context.user_data.get("panier", {})
     if key not in panier:
         return
 
     if action == "plus":
         panier[key] += 1
-    elif action == "moins":
+    else:
         panier[key] -= 1
         if panier[key] <= 0:
             panier.pop(key)
 
     await afficher_panier(q, context)
 
-
 async def panier_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     await afficher_panier(q, context)
-
 
 async def afficher_panier(q, context):
     panier = context.user_data.get("panier", {})
@@ -207,127 +206,114 @@ async def afficher_panier(q, context):
         reply_markup=InlineKeyboardMarkup(boutons)
     )
 
-
 async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     context.user_data["attente_infos"] = True
-    await q.edit_message_text("Merci de nous fournir :\n\n- Ton adresse 📍\n\n- Ton numéro 📲")
-
-
-# =====================
-# CLIENT ANNULATION
-# =====================
-async def annuler_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-    oid = q.data.replace("cancel_", "")
-    commande = COMMANDES.get(oid)
-    if not commande or commande["statut"] != "EN ATTENTE":
-        await q.edit_message_text("⚠️ Annulation impossible.")
-        return
-
-    commande["statut"] = "ANNULÉE"
-
-    await context.bot.edit_message_text(
-        chat_id=ADMIN_ID,
-        message_id=commande["admin_message_id"],
-        text=q.message.text.replace("⏳ *STATUT : EN ATTENTE*", "❌ *STATUT : ANNULÉE PAR LE CLIENT*"),
-        parse_mode="Markdown"
+    await q.edit_message_text(
+        "Merci de nous fournir :\n\n- Ton adresse 📍\n\n- Ton numéro 📲"
     )
 
-    await q.edit_message_text("❌ *Commande annulée*", parse_mode="Markdown")
-
-
 # =====================
-# ADMIN
+# STATUTS
 # =====================
 def boutons_suivi(oid):
     return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("⏳ Préparation", callback_data=f"prep_{oid}"),
-            InlineKeyboardButton("🏎️ Livraison", callback_data=f"livraison_{oid}")
-        ],
+        [InlineKeyboardButton("⏳ Préparation", callback_data=f"prep_{oid}")],
+        [InlineKeyboardButton("🏎️ Livraison", callback_data=f"livraison_{oid}")],
         [InlineKeyboardButton("✅ Livrée", callback_data=f"livree_{oid}")]
     ])
 
+async def update_admin(context, oid, statut, reply_markup=None):
+    cmd = COMMANDES.get(oid)
+    if not cmd:
+        return
 
+    base = cmd["admin_texte"].rsplit("\n\n", 1)[0]
+    new_text = base + f"\n\n{statut}"
+
+    await context.bot.edit_message_text(
+        chat_id=ADMIN_ID,
+        message_id=cmd["admin_message_id"],
+        text=new_text,
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+    )
+
+    cmd["admin_texte"] = new_text
+
+async def update_client(context, oid, statut):
+    cmd = COMMANDES.get(oid)
+    if not cmd:
+        return
+
+    panier = cmd["panier"]
+    texte = "🧾 *Récap de ta commande*\n\n"
+    for k, q in panier.items():
+        texte += f"{MENU[k]['nom']} x{q}\n"
+
+    texte += f"\n💰 Total : {calcul_total(panier)} {DEVISE}"
+    texte += f"\n🆔 Commande : `{oid}`"
+    texte += f"\n\n{statut}"
+
+    await context.bot.edit_message_text(
+        chat_id=cmd["client_id"],
+        message_id=cmd["message_id"],
+        text=texte,
+        parse_mode="Markdown"
+    )
+
+# =====================
+# ADMIN ACTIONS
+# =====================
 async def accepter_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     oid = q.data.replace("accept_", "")
-    commande = COMMANDES.get(oid)
-    if not commande:
-        return
 
-    commande["statut"] = "ACCEPTÉE"
-
-    await update_recap_client(context, oid, "🟢 *COMMANDE ACCEPTÉE*")
-
-    await q.edit_message_reply_markup(reply_markup=boutons_suivi(oid))
-
+    await update_client(context, oid, "🟢 *COMMANDE ACCEPTÉE*")
+    await update_admin(context, oid, "🟢 *STATUT : COMMANDE ACCEPTÉE*", boutons_suivi(oid))
 
 async def refuser_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     oid = q.data.replace("reject_", "")
-    commande = COMMANDES.get(oid)
-    if not commande:
-        return
 
-    commande["statut"] = "REFUSÉE"
-    await update_recap_client(context, oid, "🔴 *COMMANDE REFUSÉE*")
-    await q.edit_message_reply_markup(reply_markup=None)
-
+    await update_client(context, oid, "🔴 *COMMANDE REFUSÉE*")
+    await update_admin(context, oid, "🔴 *STATUT : COMMANDE REFUSÉE*")
 
 async def suivi_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     action, oid = q.data.split("_", 1)
-    commande = COMMANDES.get(oid)
-    if not commande:
-        return
 
-    statut_map = {
-        "prep": "⏳ *EN PRÉPARATION*",
-        "livraison": "🏎️ *EN LIVRAISON*",
-        "livree": "✅ *COMMANDE LIVRÉE*"
+    statuts = {
+        "prep": "⏳ *STATUT : EN PRÉPARATION*",
+        "livraison": "🏎️ *STATUT : EN LIVRAISON*",
+        "livree": "✅ *STATUT : COMMANDE LIVRÉE*"
     }
 
-    statut = statut_map[action]
-    commande["statut"] = statut
+    statut = statuts[action]
 
-    await update_recap_client(context, oid, statut)
-    await q.edit_message_reply_markup(reply_markup=None if action == "livree" else boutons_suivi(oid))
+    await update_client(context, oid, statut)
+    await update_admin(context, oid, statut, None if action == "livree" else boutons_suivi(oid))
 
+# =====================
+# ANNULATION CLIENT
+# =====================
+async def annuler_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    oid = q.data.replace("cancel_", "")
+
+    await update_admin(context, oid, "❌ *COMMANDE ANNULÉE PAR LE CLIENT*")
+    await q.edit_message_text("❌ *Commande annulée*", parse_mode="Markdown")
 
 # =====================
 # UTILS
 # =====================
-async def update_recap_client(context, oid, statut):
-    commande = COMMANDES.get(oid)
-    if not commande:
-        return
-
-    texte = "🧾 *Récap de ta commande*\n\n"
-    for k, qte in commande["panier"].items():
-        texte += f"{MENU[k]['nom']} x{qte}\n"
-
-    texte += f"\n💰 Total : {calcul_total(commande['panier'])} {DEVISE}"
-    texte += f"\n🆔 Commande : `{oid}`"
-    texte += f"\n\n{statut}"
-
-    await context.bot.edit_message_text(
-        chat_id=commande["client_id"],
-        message_id=commande["message_id"],
-        text=texte,
-        parse_mode="Markdown"
-    )
-
-
 def calcul_total(panier):
     return sum(MENU[k]["prix"] * q for k, q in panier.items())
-
 
 # =====================
 # MAIN
@@ -350,7 +336,6 @@ def main():
 
     print("🤖 Zone6 Food — Bot actif")
     app.run_polling()
-
 
 if __name__ == "__main__":
     main()
