@@ -169,12 +169,19 @@ async def panier_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await afficher_panier(q, context)
 
 # =====================
-# PANIER (MODIFIABLE)
+# PANIER (MODIF ICI UNIQUEMENT)
 # =====================
 async def afficher_panier(q, context):
     panier = context.user_data.get("panier", {})
+
     if not panier:
-        await q.edit_message_text("🛒 Panier vide")
+        await q.edit_message_text(
+            "🛒 *Ton panier est vide*\n\nAjoute des produits depuis le menu 👇",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("⬅️ Retour au menu", callback_data="boutique")]
+            ])
+        )
         return
 
     texte = "🛒 *Ton panier*\n\n"
