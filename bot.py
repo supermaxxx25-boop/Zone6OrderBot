@@ -260,10 +260,10 @@ async def accepter_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if oid not in COMMANDES:
         return
 
-    await maj_recap_client(context, oid, "🟢 *STATUT : COMMANDE ACCEPTÉE*")
+    await maj_recap_client(context, oid, "🟢 *COMMANDE ACCEPTÉE*")
 
     await q.edit_message_text(
-        q.message.text + "\n\n🟢 *STATUT : ACCEPTÉE*",
+        q.message.text + "\n\n🟢 *COMMANDE ACCEPTÉE*",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("⏳ En préparation", callback_data=f"prep_{oid}")]
@@ -275,10 +275,10 @@ async def preparation_commande(update: Update, context: ContextTypes.DEFAULT_TYP
     await q.answer()
 
     oid = q.data.replace("prep_", "")
-    await maj_recap_client(context, oid, "⏳ *STATUT : EN PRÉPARATION*")
+    await maj_recap_client(context, oid, "⏳ *EN PRÉPARATION*")
 
     await q.edit_message_text(
-        q.message.text + "\n\n⏳ *STATUT : EN PRÉPARATION*",
+        q.message.text + "\n\n⏳ *EN PRÉPARATION*",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🏎️ En livraison", callback_data=f"livraison_{oid}")]
@@ -290,10 +290,10 @@ async def livraison_commande(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await q.answer()
 
     oid = q.data.replace("livraison_", "")
-    await maj_recap_client(context, oid, "🏎️ *STATUT : EN LIVRAISON*")
+    await maj_recap_client(context, oid, "🏎️ *EN LIVRAISON*")
 
     await q.edit_message_text(
-        q.message.text + "\n\n🏎️ *STATUT : EN LIVRAISON*",
+        q.message.text + "\n\n🏎️ *EN LIVRAISON*",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("✅ Commande livrée", callback_data=f"livree_{oid}")]
@@ -305,7 +305,7 @@ async def livree_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await q.answer()
 
     oid = q.data.replace("livree_", "")
-    await maj_recap_client(context, oid, "✅ *STATUT : COMMANDE LIVRÉE — MERCI ❤️*")
+    await maj_recap_client(context, oid, "✅ *COMMANDE LIVRÉE — MERCI ❤️*")
 
     COMMANDES.pop(oid, None)
 
@@ -319,12 +319,12 @@ async def refuser_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await q.answer()
 
     oid = q.data.replace("reject_", "")
-    await maj_recap_client(context, oid, "❌ *STATUT : COMMANDE REFUSÉE*")
+    await maj_recap_client(context, oid, "❌ *COMMANDE REFUSÉE*")
 
     COMMANDES.pop(oid, None)
 
     await q.edit_message_text(
-        q.message.text + "\n\n🔴 *STATUT : REFUSÉE*",
+        q.message.text + "\n\n🔴 *COMMANDE REFUSÉE*",
         parse_mode="Markdown"
     )
 
