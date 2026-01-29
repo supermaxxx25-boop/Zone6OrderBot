@@ -102,11 +102,13 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ])
         )
 
+        # 🔧 sauvegarde complète
         COMMANDES[order_id] = {
             "client_id": user.id,
             "panier": panier.copy(),
             "message_id": msg_client.message_id,
-            "admin_message_id": msg_admin.message_id
+            "admin_message_id": msg_admin.message_id,
+            "admin_text": texte_admin
         }
 
         context.user_data.clear()
@@ -183,33 +185,36 @@ async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================
-# ANNULATION CLIENT
+# ANNULATION CLIENT (CORRIGÉ)
 # =====================
 async def annuler_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     oid = q.data.replace("cancel_", "")
 
-    if oid not in COMMANDES:
+    commande = COMMANDES.get(oid)
+    if not commande:
         await q.edit_message_text("⚠️ Cette commande ne peut plus être annulée.")
         return
-
-    commande = COMMANDES.pop(oid)
 
     await q.edit_message_text(
         "❌ *Commande annulée avec succès*",
         parse_mode="Markdown"
     )
 
+    # 🔥 on garde le message admin et on enlève les boutons
     try:
         await context.bot.edit_message_text(
             chat_id=ADMIN_ID,
             message_id=commande["admin_message_id"],
-            text="❌ *COMMANDE ANNULÉE PAR LE CLIENT*",
-            parse_mode="Markdown"
+            text=commande["admin_text"] + "\n\n❌ *COMMANDE ANNULÉE PAR LE CLIENT*",
+            parse_mode="Markdown",
+            reply_markup=None
         )
     except:
         pass
+
+    COMMANDES.pop(oid)
 
 # =====================
 # ADMIN ACTIONS
@@ -218,8 +223,10 @@ async def accepter_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     oid = q.data.replace("accept_", "")
-    if oid not in COMMANDES:
+    commande = COMMANDES.get(oid)
+    if not commande:
         return
+
     await update_recap_client(context, oid, "🟢 *COMMANDE ACCEPTÉE*")
     await q.edit_message_reply_markup(reply_markup=None)
 
@@ -227,11 +234,13 @@ async def refuser_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     oid = q.data.replace("reject_", "")
-    if oid not in COMMANDES:
+    commande = COMMANDES.get(oid)
+    if not commande:
         return
+
     await update_recap_client(context, oid, "🔴 *COMMANDE REFUSÉE*")
-    COMMANDES.pop(oid)
     await q.edit_message_reply_markup(reply_markup=None)
+    COMMANDES.pop(oid)
 
 # =====================
 # UTILS
@@ -241,11 +250,13 @@ async def update_recap_client(context, oid, statut):
     if not commande:
         return
 
+    panier = commande["panier"]
+
     texte = "🧾 *Récap de ta commande*\n\n"
-    for k, qte in commande["panier"].items():
+    for k, qte in panier.items():
         texte += f"{MENU[k]['nom']} x{qte}\n"
 
-    texte += f"\n💰 Total : {calcul_total(commande['panier'])} {DEVISE}"
+    texte += f"\n💰 Total : {calcul_total(panier)} {DEVISE}"
     texte += f"\n🆔 Commande : `{oid}`"
     texte += f"\n\n{statut}"
 
