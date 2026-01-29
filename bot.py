@@ -74,13 +74,19 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         recap += f"\n🆔 Commande : `{order_id}`"
         recap += "\n\n⏳ *STATUT : EN ATTENTE DE VALIDATION*"
 
-        msg_client = await update.message.reply_text(
+        msg = await update.message.reply_text(
             recap,
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("❌ Annuler la commande", callback_data=f"cancel_{order_id}")]
             ])
         )
+
+        COMMANDES[order_id] = {
+            "client_id": user.id,
+            "panier": panier.copy(),
+            "message_id": msg.message_id
+        }
 
         texte_admin = "🆕 *NOUVELLE COMMANDE*\n\n"
         for k, qte in panier.items():
@@ -90,7 +96,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         texte_admin += f"\n📍 Infos : {infos}"
         texte_admin += f"\n🆔 `{order_id}`"
 
-        msg_admin = await context.bot.send_message(
+        await context.bot.send_message(
             ADMIN_ID,
             texte_admin,
             parse_mode="Markdown",
@@ -101,15 +107,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ]
             ])
         )
-
-        # 🔧 sauvegarde complète
-        COMMANDES[order_id] = {
-            "client_id": user.id,
-            "panier": panier.copy(),
-            "message_id": msg_client.message_id,
-            "admin_message_id": msg_admin.message_id,
-            "admin_text": texte_admin
-        }
 
         context.user_data.clear()
         return
@@ -159,23 +156,65 @@ async def panier_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def afficher_panier(q, context):
     panier = context.user_data.get("panier", {})
     if not panier:
-        await q.edit_message_text("🛒 Panier vide")
+        await q.edit_message_text(
+            "🛒 Panier vide",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("⬅️ Menu", callback_data="boutique")]
+            ])
+        )
         return
 
     texte = "🛒 *Ton panier*\n\n"
+    boutons = []
+
     for k, qte in panier.items():
         texte += f"{MENU[k]['nom']} x{qte}\n"
+        boutons.append([
+            InlineKeyboardButton("➖", callback_data=f"minus_{k}"),
+            InlineKeyboardButton("➕", callback_data=f"plus_{k}"),
+            InlineKeyboardButton("🗑️", callback_data=f"del_{k}")
+        ])
+
     texte += f"\n💰 Total : {calcul_total(panier)} {DEVISE}"
+
+    boutons.append([InlineKeyboardButton("✅ Commander", callback_data="valider")])
+    boutons.append([InlineKeyboardButton("⬅️ Menu", callback_data="boutique")])
 
     await q.edit_message_text(
         texte,
         parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ Commander", callback_data="valider")],
-            [InlineKeyboardButton("⬅️ Menu", callback_data="boutique")]
-        ])
+        reply_markup=InlineKeyboardMarkup(boutons)
     )
 
+# =====================
+# PANIER ACTIONS
+# =====================
+async def plus_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    key = q.data.replace("plus_", "")
+    context.user_data["panier"][key] += 1
+    await afficher_panier(q, context)
+
+async def minus_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    key = q.data.replace("minus_", "")
+    context.user_data["panier"][key] -= 1
+    if context.user_data["panier"][key] <= 0:
+        context.user_data["panier"].pop(key)
+    await afficher_panier(q, context)
+
+async def del_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    key = q.data.replace("del_", "")
+    context.user_data["panier"].pop(key, None)
+    await afficher_panier(q, context)
+
+# =====================
+# VALIDATION
+# =====================
 async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
@@ -185,48 +224,27 @@ async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================
-# ANNULATION CLIENT (CORRIGÉ)
+# ANNULATION CLIENT
 # =====================
 async def annuler_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     oid = q.data.replace("cancel_", "")
 
-    commande = COMMANDES.get(oid)
-    if not commande:
+    if oid not in COMMANDES:
         await q.edit_message_text("⚠️ Cette commande ne peut plus être annulée.")
         return
 
-    await q.edit_message_text(
-        "❌ *Commande annulée avec succès*",
-        parse_mode="Markdown"
-    )
-
-    # 🔥 on garde le message admin et on enlève les boutons
-    try:
-        await context.bot.edit_message_text(
-            chat_id=ADMIN_ID,
-            message_id=commande["admin_message_id"],
-            text=commande["admin_text"] + "\n\n❌ *COMMANDE ANNULÉE PAR LE CLIENT*",
-            parse_mode="Markdown",
-            reply_markup=None
-        )
-    except:
-        pass
-
     COMMANDES.pop(oid)
+    await q.edit_message_text("❌ *Commande annulée avec succès*", parse_mode="Markdown")
 
 # =====================
-# ADMIN ACTIONS
+# ADMIN
 # =====================
 async def accepter_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     oid = q.data.replace("accept_", "")
-    commande = COMMANDES.get(oid)
-    if not commande:
-        return
-
     await update_recap_client(context, oid, "🟢 *COMMANDE ACCEPTÉE*")
     await q.edit_message_reply_markup(reply_markup=None)
 
@@ -234,13 +252,9 @@ async def refuser_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     oid = q.data.replace("reject_", "")
-    commande = COMMANDES.get(oid)
-    if not commande:
-        return
-
     await update_recap_client(context, oid, "🔴 *COMMANDE REFUSÉE*")
+    COMMANDES.pop(oid, None)
     await q.edit_message_reply_markup(reply_markup=None)
-    COMMANDES.pop(oid)
 
 # =====================
 # UTILS
@@ -251,7 +265,6 @@ async def update_recap_client(context, oid, statut):
         return
 
     panier = commande["panier"]
-
     texte = "🧾 *Récap de ta commande*\n\n"
     for k, qte in panier.items():
         texte += f"{MENU[k]['nom']} x{qte}\n"
@@ -282,9 +295,15 @@ def main():
     app.add_handler(CallbackQueryHandler(ajouter, "^add_"))
     app.add_handler(CallbackQueryHandler(panier_handler, "^panier$"))
     app.add_handler(CallbackQueryHandler(valider, "^valider$"))
+
+    app.add_handler(CallbackQueryHandler(plus_item, "^plus_"))
+    app.add_handler(CallbackQueryHandler(minus_item, "^minus_"))
+    app.add_handler(CallbackQueryHandler(del_item, "^del_"))
+
     app.add_handler(CallbackQueryHandler(annuler_commande, "^cancel_"))
     app.add_handler(CallbackQueryHandler(accepter_commande, "^accept_"))
     app.add_handler(CallbackQueryHandler(refuser_commande, "^reject_"))
+
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
     print("🤖 Zone6 Food — Bot actif")
