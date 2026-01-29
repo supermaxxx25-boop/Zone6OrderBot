@@ -72,7 +72,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         recap += f"\n💰 Total : {total} {DEVISE}"
         recap += f"\n🆔 Commande : `{order_id}`"
-        recap += "\n\n📦 *STATUT ACTUEL*\n⏳ En attente de validation"
+        recap += "\n\n⏳ *STATUT : EN ATTENTE DE VALIDATION*"
 
         msg = await update.message.reply_text(
             recap,
@@ -213,7 +213,7 @@ async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # =====================
-# ANNULATION CLIENT
+# ANNULATION CLIENT (MODIF ICI UNIQUEMENT)
 # =====================
 async def annuler_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -222,15 +222,25 @@ async def annuler_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     commande = COMMANDES.get(oid)
     if not commande:
+        await q.edit_message_text("⚠️ Cette commande ne peut plus être annulée.")
         return
 
-    await context.bot.edit_message_reply_markup(
-        chat_id=ADMIN_ID,
-        message_id=commande["admin_message_id"],
-        reply_markup=None
-    )
+    # 🔴 Mise à jour du message admin EXISTANT
+    try:
+        await context.bot.edit_message_text(
+            chat_id=ADMIN_ID,
+            message_id=commande["admin_message_id"],
+            text=q.message.text + "\n\n❌ *COMMANDE ANNULÉE PAR LE CLIENT*",
+            parse_mode="Markdown",
+            reply_markup=None
+        )
+    except:
+        pass
 
-    await update_recap_client(context, oid, "❌ Commande annulée par le client")
+    await q.edit_message_text(
+        "❌ *Commande annulée avec succès*",
+        parse_mode="Markdown"
+    )
 
 # =====================
 # ADMIN
@@ -239,18 +249,18 @@ async def accepter_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     oid = q.data.replace("accept_", "")
-    await update_recap_client(context, oid, "🟢 Commande acceptée")
+    await update_recap_client(context, oid, "🟢 *COMMANDE ACCEPTÉE*")
     await q.edit_message_reply_markup(reply_markup=None)
 
 async def refuser_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     oid = q.data.replace("reject_", "")
-    await update_recap_client(context, oid, "🔴 Commande refusée")
+    await update_recap_client(context, oid, "🔴 *COMMANDE REFUSÉE*")
     await q.edit_message_reply_markup(reply_markup=None)
 
 # =====================
-# UTILS (CLIENT : PAS D’HISTORIQUE)
+# UTILS
 # =====================
 async def update_recap_client(context, oid, statut):
     commande = COMMANDES.get(oid)
@@ -265,7 +275,7 @@ async def update_recap_client(context, oid, statut):
 
     texte += f"\n💰 Total : {calcul_total(panier)} {DEVISE}"
     texte += f"\n🆔 Commande : `{oid}`"
-    texte += f"\n\n📦 *STATUT ACTUEL*\n{statut}"
+    texte += f"\n\n{statut}"
 
     await context.bot.edit_message_text(
         chat_id=commande["client_id"],
