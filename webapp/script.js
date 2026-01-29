@@ -4,33 +4,36 @@ let total = 0;
 const tg = window.Telegram.WebApp;
 tg.expand();
 
-function add(name, price) {
-  cart.push(name + " - " + price + "€");
+function addItem(name, price) {
+  cart.push({ name, price });
   total += price;
-  render();
+  renderCart();
 }
 
-function render() {
+function renderCart() {
   const list = document.getElementById("cart");
   list.innerHTML = "";
-  cart.forEach(i => {
+
+  cart.forEach(item => {
     const li = document.createElement("li");
-    li.textContent = i;
+    li.textContent = `${item.name} - ${item.price} €`;
     list.appendChild(li);
   });
+
   document.getElementById("total").innerText = total;
 }
 
-function send() {
+function sendOrder() {
   if (cart.length === 0) {
     alert("Panier vide");
     return;
   }
 
-  tg.sendData(JSON.stringify({
+  const order = {
     items: cart,
     total: total
-  }));
+  };
 
+  tg.sendData(JSON.stringify(order));
   tg.close();
 }
