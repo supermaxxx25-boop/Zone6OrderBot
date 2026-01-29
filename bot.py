@@ -1,6 +1,5 @@
 import os
 import uuid
-import json
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -19,20 +18,6 @@ ADMIN_ID = 8348647959
 DEVISE = "€"
 
 COMMANDES = {}
-COMMANDES_FILE = "commandes.json"
-
-# =====================
-# PERSISTENCE
-# =====================
-def save_commandes():
-    with open(COMMANDES_FILE, "w") as f:
-        json.dump(COMMANDES, f)
-
-def load_commandes():
-    global COMMANDES
-    if os.path.exists(COMMANDES_FILE):
-        with open(COMMANDES_FILE, "r") as f:
-            COMMANDES = json.load(f)
 
 # =====================
 # MENU
@@ -77,24 +62,17 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         user = update.message.from_user
+        username = f"@{user.username}" if user.username else "—"
         infos = update.message.text
         order_id = str(uuid.uuid4())[:8]
         total = calcul_total(panier)
 
         COMMANDES[order_id] = {
             "client_id": user.id,
-            "client_nom": user.first_name,
-            "client_username": user.username,
             "panier": panier.copy()
         }
-        save_commandes()
 
         recap = "🧾 *Récap de ta commande*\n\n"
-        recap += f"👤 Client : {user.first_name}\n"
-        if user.username:
-            recap += f"🔗 @{user.username}\n"
-
-        recap += "\n"
         for k, qte in panier.items():
             recap += f"{MENU[k]['nom']} x{qte}\n"
 
@@ -111,16 +89,13 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         COMMANDES[order_id]["message_id"] = msg.message_id
-        save_commandes()
 
         texte = (
             "🆕 *NOUVELLE COMMANDE*\n\n"
-            f"👤 Client : {user.first_name}\n"
+            f"👤 Client : {user.full_name}\n"
+            f"🔗 {username}\n\n"
         )
-        if user.username:
-            texte += f"🔗 @{user.username}\n"
 
-        texte += "\n"
         for k, qte in panier.items():
             texte += f"{MENU[k]['nom']} x{qte}\n"
 
@@ -236,10 +211,16 @@ async def annuler_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.edit_message_text("⚠️ Cette commande ne peut plus être annulée.")
         return
 
-    COMMANDES.pop(oid)
-    save_commandes()
+    if q.from_user.id != COMMANDES[oid]["client_id"]:
+        await q.answer("Action non autorisée", show_alert=True)
+        return
 
-    await q.edit_message_text("❌ *Commande annulée avec succès*", parse_mode="Markdown")
+    COMMANDES.pop(oid)
+
+    await q.edit_message_text(
+        "❌ *Commande annulée avec succès*",
+        parse_mode="Markdown"
+    )
 
     await context.bot.send_message(
         ADMIN_ID,
@@ -255,16 +236,13 @@ async def maj_recap_client(context, oid, statut):
     if not commande:
         return
 
-    texte = "🧾 *Récap de ta commande*\n\n"
-    texte += f"👤 Client : {commande['client_nom']}\n"
-    if commande.get("client_username"):
-        texte += f"🔗 @{commande['client_username']}\n"
+    panier = commande["panier"]
 
-    texte += "\n"
-    for k, qte in commande["panier"].items():
+    texte = "🧾 *Récap de ta commande*\n\n"
+    for k, qte in panier.items():
         texte += f"{MENU[k]['nom']} x{qte}\n"
 
-    texte += f"\n💰 Total : {calcul_total(commande['panier'])} {DEVISE}"
+    texte += f"\n💰 Total : {calcul_total(panier)} {DEVISE}"
     texte += f"\n🆔 Commande : `{oid}`"
     texte += f"\n\n{statut}"
 
@@ -287,13 +265,12 @@ def calcul_total(panier):
 async def accepter_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    oid = q.data.replace("accept_", "")
 
+    oid = q.data.replace("accept_", "")
     if oid not in COMMANDES:
         return
 
     await maj_recap_client(context, oid, "🟢 *COMMANDE ACCEPTÉE*")
-    save_commandes()
 
     await q.edit_message_text(
         q.message.text + "\n\n🟢 *COMMANDE ACCEPTÉE*",
@@ -303,14 +280,58 @@ async def accepter_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
     )
 
+async def preparation_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    oid = q.data.replace("prep_", "")
+    await maj_recap_client(context, oid, "⏳ *EN PRÉPARATION*")
+
+    await q.edit_message_text(
+        q.message.text + "\n\n⏳ *EN PRÉPARATION*",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🏎️ En livraison", callback_data=f"livraison_{oid}")]
+        ])
+    )
+
+async def livraison_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    oid = q.data.replace("livraison_", "")
+    await maj_recap_client(context, oid, "🏎️ *EN LIVRAISON*")
+
+    await q.edit_message_text(
+        q.message.text + "\n\n🏎️ *EN LIVRAISON*",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ Commande livrée", callback_data=f"livree_{oid}")]
+        ])
+    )
+
+async def livree_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    oid = q.data.replace("livree_", "")
+    await maj_recap_client(context, oid, "✅ *COMMANDE LIVRÉE — MERCI ❤️*")
+
+    COMMANDES.pop(oid, None)
+
+    await q.edit_message_text(
+        q.message.text + "\n\n✅ *STATUT : LIVRÉE*",
+        parse_mode="Markdown"
+    )
+
 async def refuser_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    oid = q.data.replace("reject_", "")
 
+    oid = q.data.replace("reject_", "")
     await maj_recap_client(context, oid, "❌ *COMMANDE REFUSÉE*")
+
     COMMANDES.pop(oid, None)
-    save_commandes()
 
     await q.edit_message_text(
         q.message.text + "\n\n🔴 *COMMANDE REFUSÉE*",
@@ -321,8 +342,6 @@ async def refuser_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # MAIN
 # =====================
 def main():
-    load_commandes()
-
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -335,6 +354,9 @@ def main():
 
     app.add_handler(CallbackQueryHandler(accepter_commande, "^accept_"))
     app.add_handler(CallbackQueryHandler(refuser_commande, "^reject_"))
+    app.add_handler(CallbackQueryHandler(preparation_commande, "^prep_"))
+    app.add_handler(CallbackQueryHandler(livraison_commande, "^livraison_"))
+    app.add_handler(CallbackQueryHandler(livree_commande, "^livree_"))
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
