@@ -62,6 +62,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         user = update.message.from_user
+        username = f"@{user.username}" if user.username else "—"
         infos = update.message.text
         order_id = str(uuid.uuid4())[:8]
         total = calcul_total(panier)
@@ -89,7 +90,12 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         COMMANDES[order_id]["message_id"] = msg.message_id
 
-        texte = "🆕 *NOUVELLE COMMANDE*\n\n"
+        texte = (
+            "🆕 *NOUVELLE COMMANDE*\n\n"
+            f"👤 Client : {user.full_name}\n"
+            f"🔗 {username}\n\n"
+        )
+
         for k, qte in panier.items():
             texte += f"{MENU[k]['nom']} x{qte}\n"
 
@@ -182,7 +188,6 @@ async def afficher_panier(q, context):
         ])
     )
 
-# ✅ SEULE MODIFICATION ICI
 async def valider(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
