@@ -1,78 +1,65 @@
 body {
   margin: 0;
   font-family: Arial, sans-serif;
-  background: #1c1c1c;
+  background: #1b1b1b;
   color: #fff;
 }
 
 header {
+  background: #111;
+  padding: 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 15px;
-  background: #111;
 }
 
 #cart-btn {
-  background: #c7c400;
+  background: #d4c800;
   color: #000;
-  padding: 6px 10px;
+  padding: 6px 12px;
   border-radius: 20px;
-  cursor: pointer;
   font-weight: bold;
-}
-
-.filters {
-  padding: 10px;
+  cursor: pointer;
 }
 
 select {
-  width: 100%;
-  padding: 10px;
+  width: 95%;
+  margin: 10px auto;
+  display: block;
+  padding: 8px;
   border-radius: 8px;
-  border: none;
 }
 
 main {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  padding: 12px;
+  gap: 10px;
+  padding: 10px;
 }
 
 .card {
   background: #2a2a2a;
-  border-radius: 14px;
+  border-radius: 12px;
   overflow: hidden;
 }
 
 .card img {
   width: 100%;
-  height: 140px;
+  height: 130px;
   object-fit: cover;
 }
 
-.card-content {
-  padding: 10px;
-}
-
-.badge {
-  background: #444;
-  padding: 4px 8px;
-  border-radius: 10px;
-  font-size: 12px;
-  display: inline-block;
-  margin-bottom: 5px;
+.card div {
+  padding: 8px;
 }
 
 button {
-  background: #c7c400;
-  border: none;
-  padding: 8px;
   width: 100%;
+  padding: 8px;
+  border: none;
   border-radius: 10px;
+  background: #d4c800;
   font-weight: bold;
-  cursor: pointer;
 }
 
 #cart {
