@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>La Zone6 🌿</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -9,28 +9,29 @@
 </head>
 <body>
 
-<h1>🌿 LA ZONE6</h1>
-<p>CBD légal – Livraison rapide</p>
+  <h1>🌿 LA ZONE6</h1>
+  <p>CBD légal – Livraison rapide</p>
 
-<div class="product">
-  <h3>🌱 Fleur CBD Premium</h3>
-  <p>10€</p>
-  <button onclick="add('Fleur CBD Premium', 10)">Ajouter</button>
-</div>
+  <div class="product">
+    <h3>🌱 Fleur CBD</h3>
+    <p>10 €</p>
+    <button onclick="addItem('Fleur CBD', 10)">Ajouter</button>
+  </div>
 
-<div class="product">
-  <h3>🍫 Résine CBD</h3>
-  <p>15€</p>
-  <button onclick="add('Résine CBD', 15)">Ajouter</button>
-</div>
+  <div class="product">
+    <h3>🍫 Résine CBD</h3>
+    <p>15 €</p>
+    <button onclick="addItem('Résine CBD', 15)">Ajouter</button>
+  </div>
 
-<div class="cart">
+  <hr>
+
   <h2>🛒 Panier</h2>
   <ul id="cart"></ul>
   <p>Total : <span id="total">0</span> €</p>
-  <button onclick="send()">Commander</button>
-</div>
 
-<script src="script.js"></script>
+  <button onclick="sendOrder()">Commander</button>
+
+  <script src="script.js"></script>
 </body>
 </html>
