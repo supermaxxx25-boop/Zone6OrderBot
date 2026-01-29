@@ -231,6 +231,14 @@ async def annuler_commande(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=None
     )
 
+    # ✅ NOTIFICATION DIRECTE DANS LA COMMANDE ADMIN
+    await context.bot.send_message(
+        chat_id=ADMIN_ID,
+        text="❌ *Commande annulée par le client*",
+        parse_mode="Markdown",
+        reply_to_message_id=commande["admin_message_id"]
+    )
+
     await q.edit_message_text("❌ *Commande annulée*", parse_mode="Markdown")
 
 # =====================
