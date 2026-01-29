@@ -1,34 +1,31 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>LA ZONE6 🌿</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
 
 <header>
-  <h1>🌿 LA ZONE6</h1>
+  <h2>🌿 LA ZONE6</h2>
   <div id="cart-btn">🛒 <span id="cart-count">0</span></div>
 </header>
 
-<div class="filters">
-  <select id="categoryFilter">
-    <option value="all">Toutes les catégories</option>
-    <option value="fleurs">Fleurs_attachCBD</option>
-    <option value="resines">Résines CBD</option>
-    <option value="huiles">Huiles CBD</option>
-  </select>
-</div>
+<select id="categoryFilter">
+  <option value="all">Toutes catégories</option>
+  <option value="fleurs">Fleurs CBD</option>
+  <option value="resines">Résines CBD</option>
+</select>
 
 <main id="products"></main>
 
-<!-- PANIER -->
 <div id="cart" class="hidden">
-  <h2>🛒 Panier</h2>
+  <h3>🛒 Panier</h3>
   <div id="cart-items"></div>
-  <p id="cart-total"></p>
+  <div id="cart-total"></div>
   <button onclick="closeCart()">Fermer</button>
 </div>
 
