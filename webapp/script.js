@@ -1,28 +1,9 @@
+Telegram.WebApp.ready();
+
 const products = [
-  {
-    id: 1,
-    name: "OG Kush CBD",
-    category: "fleurs",
-    price: 10,
-    image: "https://via.placeholder.com/300x200",
-    description: "Fleur CBD premium 🌿"
-  },
-  {
-    id: 2,
-    name: "Amnesia CBD",
-    category: "fleurs",
-    price: 12,
-    image: "https://via.placeholder.com/300x200",
-    description: "Puissante et relaxante"
-  },
-  {
-    id: 3,
-    name: "Résine Gold",
-    category: "resines",
-    price: 15,
-    image: "https://via.placeholder.com/300x200",
-    description: "Résine CBD haut de gamme"
-  }
+  { id: 1, name: "OG Kush CBD", price: 10, category: "fleurs", image: "https://via.placeholder.com/300" },
+  { id: 2, name: "Amnesia CBD", price: 12, category: "fleurs", image: "https://via.placeholder.com/300" },
+  { id: 3, name: "Résine Gold", price: 15, category: "resines", image: "https://via.placeholder.com/300" }
 ];
 
 let cart = [];
@@ -41,12 +22,10 @@ function renderProducts(filter = "all") {
       productsDiv.innerHTML += `
         <div class="card">
           <img src="${p.image}">
-          <div class="card-content">
-            <span class="badge">${p.category.toUpperCase()}</span>
-            <h3>${p.name}</h3>
-            <p>${p.description}</p>
-            <p><b>${p.price}€</b></p>
-            <button onclick="addToCart(${p.id})">Ajouter au panier</button>
+          <div>
+            <b>${p.name}</b>
+            <p>${p.price}€</p>
+            <button onclick="addToCart(${p.id})">Ajouter</button>
           </div>
         </div>
       `;
@@ -71,11 +50,24 @@ function closeCart() {
 function renderCart() {
   cartItems.innerHTML = "";
   let total = 0;
+
   cart.forEach(p => {
     total += p.price;
     cartItems.innerHTML += `<p>${p.name} - ${p.price}€</p>`;
   });
-  cartTotal.textContent = "Total : " + total + "€";
+
+  cartTotal.innerHTML = `
+    <b>Total : ${total}€</b><br><br>
+    <button onclick="sendOrder()">✅ Valider la commande</button>
+  `;
+}
+
+function sendOrder() {
+  Telegram.WebApp.sendData(JSON.stringify({
+    items: cart,
+    total: cart.reduce((s, p) => s + p.price, 0)
+  }));
+  Telegram.WebApp.close();
 }
 
 document.getElementById("cart-btn").onclick = openCart;
