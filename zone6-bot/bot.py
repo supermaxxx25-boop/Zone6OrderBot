@@ -1,83 +1,66 @@
 import json
-from telegram import (
-    Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    WebAppInfo
-)
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    CallbackQueryHandler,
-    ContextTypes
+    ApplicationBuilder, CommandHandler,
+    MessageHandler, CallbackQueryHandler, ContextTypes, filters
 )
 from config import BOT_TOKEN, ADMIN_ID, WEBAPP_URL
 
-# -------- UTIL --------
 def load_orders():
-    with open("orders.json", "r") as f:
+    with open("orders.json") as f:
         return json.load(f)
 
 def save_orders(data):
     with open("orders.json", "w") as f:
         json.dump(data, f, indent=2)
 
-# -------- COMMANDES --------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton(
-            "🛒 Ouvrir la boutique",
-            web_app=WebAppInfo(url=WEBAPP_URL)
-        )]
-    ]
+    keyboard = [[InlineKeyboardButton(
+        "🛒 Ouvrir la boutique",
+        web_app=WebAppInfo(url=WEBAPP_URL)
+    )]]
     await update.message.reply_text(
-        "👋 Bienvenue dans **LA ZONE6 🌿**\n\n"
-        "🛍️ Clique ci-dessous pour accéder à la boutique",
+        "👋 Bienvenue dans **LA ZONE6 🌿**",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
 
-# -------- RÉCEPTION COMMANDE (SIMULÉE) --------
-# Cette fonction sera appelée quand tu relieras la mini-app au bot
-async def new_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def receive_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = json.loads(update.message.web_app_data.data)
     user = update.message.from_user
-    order_id = len(load_orders()) + 1
+
+    orders = load_orders()
+    order_id = len(orders) + 1
 
     order = {
         "id": order_id,
         "user_id": user.id,
         "username": user.username,
-        "items": update.message.text,
+        "items": data["items"],
+        "total": data["total"],
         "status": "pending"
     }
 
-    orders = load_orders()
     orders.append(order)
     save_orders(orders)
 
-    keyboard = [
-        [
-            InlineKeyboardButton("✅ Accepter", callback_data=f"accept_{order_id}"),
-            InlineKeyboardButton("❌ Refuser", callback_data=f"reject_{order_id}")
-        ]
-    ]
+    items_text = "\n".join(f"- {i['name']} ({i['price']}€)" for i in data["items"])
+
+    keyboard = [[
+        InlineKeyboardButton("✅ Accepter", callback_data=f"accept_{order_id}"),
+        InlineKeyboardButton("❌ Refuser", callback_data=f"reject_{order_id}")
+    ]]
 
     await context.bot.send_message(
         ADMIN_ID,
-        f"🛎️ **Nouvelle commande #{order_id}**\n"
-        f"👤 @{user.username}\n\n"
-        f"{order['items']}",
+        f"🛎️ **Commande #{order_id}**\n@{user.username}\n\n{items_text}\n\n💰 {data['total']}€",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
 
-    await update.message.reply_text(
-        "✅ Commande envoyée !\n"
-        "⏳ En attente de validation admin."
-    )
+    await update.message.reply_text("⏳ Commande envoyée, attente validation.")
 
-# -------- ACTIONS ADMIN --------
-async def handle_admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
@@ -88,33 +71,24 @@ async def handle_admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE
     order = next(o for o in orders if o["id"] == order_id)
 
     if action == "accept":
+        msg = "✅ Commande acceptée"
         order["status"] = "accepted"
-        msg = "✅ **Commande acceptée**\n⏳ En préparation"
     else:
+        msg = "❌ Commande refusée"
         order["status"] = "rejected"
-        msg = "❌ **Commande refusée**"
 
     save_orders(orders)
 
-    await context.bot.send_message(
-        order["user_id"],
-        msg,
-        parse_mode="Markdown"
-    )
+    await context.bot.send_message(order["user_id"], msg)
+    await query.edit_message_text(msg)
 
-    await query.edit_message_text(
-        f"{msg}\n\n📦 Commande #{order_id}"
-    )
-
-# -------- MAIN --------
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("commande", new_order))
-    app.add_handler(CallbackQueryHandler(handle_admin_action))
+    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, receive_order))
+    app.add_handler(CallbackQueryHandler(admin_action))
 
-    print("✅ Bot LA ZONE6 lancé")
     app.run_polling()
 
 if __name__ == "__main__":
