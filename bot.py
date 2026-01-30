@@ -23,11 +23,12 @@ COMMANDES = {}
 # MENU
 # =====================
 CATEGORIES = {
-    "burgers": {
-        "nom": "🍔 Burgers",
+    "hash": {
+        "nom": "🍫 HASH",
         "produits": {
-            "burger_simple": {"nom": "Burger simple + frites", "prix": 7},
-            "burger_double": {"nom": "Burger double + frites", "prix": 9},
+            "hash_1g": {"nom": "🍫 Hash 1g", "prix": 10},
+            "hash_2g": {"nom": "🍫 Hash 2g", "prix": 18},
+            "hash_5g": {"nom": "🍫 Hash 5g", "prix": 40},
         }
     },
     "pizzas": {
@@ -131,7 +132,7 @@ async def boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🍽️ *Menu*",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🍔 Burgers", callback_data="cat_burgers")],
+            [InlineKeyboardButton("🍫 HASH", callback_data="cat_hash")],
             [InlineKeyboardButton("🍕 Pizzas", callback_data="cat_pizzas")],
             [InlineKeyboardButton("🛒 Panier", callback_data="panier")]
         ])
@@ -182,7 +183,12 @@ async def panier_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def afficher_panier(q, context):
     panier = context.user_data.get("panier", {})
     if not panier:
-        await q.edit_message_text("🛒 Panier vide")
+        await q.edit_message_text(
+            "🛒 Panier vide",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("⬅️ Menu", callback_data="boutique")]
+            ])
+        )
         return
 
     texte = "🛒 *Ton panier*\n\n"
