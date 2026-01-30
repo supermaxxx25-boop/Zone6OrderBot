@@ -20,35 +20,63 @@ DEVISE = "€"
 COMMANDES = {}
 
 # =====================
-# MENU
+# MENU (NEUTRE)
 # =====================
 CATEGORIES = {
-    "hash": {
-        "nom": "🍫 HASH",
-        "produits": {
-            "hash_1g": {"nom": "🍫 Hash 1g", "prix": 10},
-            "hash_2g": {"nom": "🍫 Hash 2g", "prix": 18},
-            "hash_5g": {"nom": "🍫 Hash 5g", "prix": 40},
+    "cat_a": {
+        "nom": "📦 Catégorie A",
+        "sous_categories": {
+            "sub_a1": {
+                "nom": "🧽 Gamme A1",
+                "produits": {
+                    "a1_p5": {"nom": "Format 5", "prix": 20},
+                    "a1_p10": {"nom": "Format 10", "prix": 40},
+                    "a1_p25": {"nom": "Format 25", "prix": 80},
+                    "a1_p50": {"nom": "Format 50", "prix": 140},
+                    "a1_p100": {"nom": "Format 100", "prix": 250},
+                }
+            },
+            "sub_a2": {
+                "nom": "⚡️ Gamme A2",
+                "produits": {
+                    "a2_p25": {"nom": "Format 25", "prix": 140},
+                    "a2_p50": {"nom": "Format 50", "prix": 250},
+                    "a2_p100": {"nom": "Format 100", "prix": 420},
+                }
+            }
         }
     },
-    "weed": {
-        "nom": "🍃 WEED",
-        "produits": {
-            "weed_1g": {"nom": "🍃 Weed 1g", "prix": 12},
-            "weed_3g": {"nom": "🍃 Weed 3g", "prix": 30},
-            "weed_5g": {"nom": "🍃 Weed 5g", "prix": 45},
+    "cat_b": {
+        "nom": "📦 Catégorie B",
+        "sous_categories": {
+            "sub_b1": {
+                "nom": "🇺🇸 Gamme B1",
+                "produits": {
+                    "b1_p5": {"nom": "Format 5", "prix": 60},
+                    "b1_p10": {"nom": "Format 10", "prix": 100},
+                    "b1_p25": {"nom": "Format 25", "prix": 200},
+                    "b1_p50": {"nom": "Format 50", "prix": 350},
+                    "b1_p100": {"nom": "Format 100", "prix": 650},
+                }
+            }
         }
     }
 }
 
-MENU = {k: v for c in CATEGORIES.values() for k, v in c["produits"].items()}
+# Aplatir le menu pour le panier
+MENU = {
+    pid: p
+    for c in CATEGORIES.values()
+    for sc in c["sous_categories"].values()
+    for pid, p in sc["produits"].items()
+}
 
 # =====================
 # START
 # =====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 Bienvenue dans la Zone6 👽\n🛒 Tu peux commander ici 👇",
+        "👋 Bienvenue\n🛒 Tu peux commander ici 👇",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🛍️ Ouvrir la boutique", callback_data="boutique")]
         ])
@@ -84,10 +112,11 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ])
         )
 
+        username = f"@{user.username}" if user.username else "(sans username)"
         texte_admin = (
             "🆕 *NOUVELLE COMMANDE*\n\n"
             f"👤 {user.full_name}\n"
-            f"🔗 @{user.username}\n\n"
+            f"🔗 {username}\n\n"
         )
 
         for k, qte in panier.items():
@@ -129,26 +158,50 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
+    buttons = [
+        [InlineKeyboardButton(c["nom"], callback_data=f"cat_{cid}")]
+        for cid, c in CATEGORIES.items()
+    ]
+    buttons.append([InlineKeyboardButton("🛒 Panier", callback_data="panier")])
     await q.edit_message_text(
         "🍽️ *Menu*",
         parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🍫 HASH", callback_data="cat_hash")],
-            [InlineKeyboardButton("🍃 WEED", callback_data="cat_weed")],
-            [InlineKeyboardButton("🛒 Panier", callback_data="panier")]
-        ])
+        reply_markup=InlineKeyboardMarkup(buttons)
     )
 
 async def afficher_categorie(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    cat = q.data.replace("cat_", "")
-    boutons = [
-        [InlineKeyboardButton(p["nom"], callback_data=f"add_{k}")]
-        for k, p in CATEGORIES[cat]["produits"].items()
+    cid = q.data.replace("cat_", "")
+    cat = CATEGORIES[cid]
+
+    buttons = [
+        [InlineKeyboardButton(sc["nom"], callback_data=f"sub_{cid}_{sid}")]
+        for sid, sc in cat["sous_categories"].items()
     ]
-    boutons.append([InlineKeyboardButton("⬅️ Retour", callback_data="boutique")])
-    await q.edit_message_text(CATEGORIES[cat]["nom"], reply_markup=InlineKeyboardMarkup(boutons))
+    buttons.append([InlineKeyboardButton("⬅️ Retour", callback_data="boutique")])
+
+    await q.edit_message_text(
+        cat["nom"],
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
+
+async def afficher_sous_categorie(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    _, cid, sid = q.data.split("_", 2)
+    sc = CATEGORIES[cid]["sous_categories"][sid]
+
+    buttons = [
+        [InlineKeyboardButton(p["nom"], callback_data=f"add_{pid}")]
+        for pid, p in sc["produits"].items()
+    ]
+    buttons.append([InlineKeyboardButton("⬅️ Retour", callback_data=f"cat_{cid}")])
+
+    await q.edit_message_text(
+        sc["nom"],
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
 
 async def ajouter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -331,6 +384,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(boutique, "^boutique$"))
     app.add_handler(CallbackQueryHandler(afficher_categorie, "^cat_"))
+    app.add_handler(CallbackQueryHandler(afficher_sous_categorie, "^sub_"))
     app.add_handler(CallbackQueryHandler(ajouter, "^add_"))
     app.add_handler(CallbackQueryHandler(modifier_qte, "^(plus|moins)_"))
     app.add_handler(CallbackQueryHandler(panier_handler, "^panier$"))
@@ -341,7 +395,7 @@ def main():
     app.add_handler(CallbackQueryHandler(suivi_commande, "^(prep|livraison|livree)_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
-    print("🤖 Zone6 Food — Bot actif")
+    print("🤖 Bot actif")
     app.run_polling()
 
 if __name__ == "__main__":
