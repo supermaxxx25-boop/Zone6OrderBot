@@ -31,11 +31,12 @@ CATEGORIES = {
             "hash_5g": {"nom": "🍫 Hash 5g", "prix": 40},
         }
     },
-    "pizzas": {
-        "nom": "🍕 Pizzas",
+    "weed": {
+        "nom": "🍃 WEED",
         "produits": {
-            "pizza_fromage": {"nom": "Pizza fromage", "prix": 10},
-            "pizza_pepperoni": {"nom": "Pizza pepperoni", "prix": 11},
+            "weed_1g": {"nom": "🍃 Weed 1g", "prix": 12},
+            "weed_3g": {"nom": "🍃 Weed 3g", "prix": 30},
+            "weed_5g": {"nom": "🍃 Weed 5g", "prix": 45},
         }
     }
 }
@@ -133,7 +134,7 @@ async def boutique(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🍫 HASH", callback_data="cat_hash")],
-            [InlineKeyboardButton("🍕 Pizzas", callback_data="cat_pizzas")],
+            [InlineKeyboardButton("🍃 WEED", callback_data="cat_weed")],
             [InlineKeyboardButton("🛒 Panier", callback_data="panier")]
         ])
     )
